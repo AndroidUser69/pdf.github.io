@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador de Cadastro - Ferro, Aço e Alumínio</title>
+    <title>Gerador de Medidas - Ferro, Aço e Alumínio</title>
     <!-- 1. Adicionando o Tailwind CSS para um visual moderno -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -681,6 +681,23 @@
         //     return;
         // }
         inventario = inventario.filter(i => i.id !== id);
+        renderInventario();
+    }
+
+    /**
+     * NOVO: Move um item para cima ou para baixo.
+     */
+    function moverItem(id, direcao) {
+        const index = inventario.findIndex(i => i.id === id);
+
+        if (direcao === 'up' && index > 0) {
+            // Troca com o item anterior
+            [inventario[index - 1], inventario[index]] = [inventario[index], inventario[index - 1]];
+        } else if (direcao === 'down' && index < inventario.length - 1) {
+            // Troca com o próximo item
+            [inventario[index + 1], inventario[index]] = [inventario[index], inventario[index + 1]];
+        }
+        
         renderInventario();
     }
 
