@@ -28,11 +28,224 @@
         .resultado-item {
             word-break: break-word;
         }
+
+        /* NOVO: Estilos para a tabela da régua */
+        #sidebar-regua table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem; /* text-sm */
+        }
+        #sidebar-regua th {
+            background-color: #374151; /* bg-gray-700 */
+            color: #FFFFFF; /* text-white */
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            font-weight: 600; /* font-semibold */
+        }
+        #sidebar-regua td {
+            border-bottom: 1px solid #4B5563; /* border-gray-600 */
+            padding: 0.5rem 0.75rem;
+        }
+        #sidebar-regua tr:last-child td {
+            border-bottom: none;
+        }
+        #sidebar-regua h4 {
+            font-size: 1rem; /* text-base */
+            font-weight: 700; /* font-bold */
+            color: #93C5FD; /* text-blue-300 */
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #4B5563; /* border-gray-600 */
+            padding-bottom: 0.25rem;
+        }
+        
+        /* MUDANÇA: Estilo para as novas descrições */
+        #sidebar-regua p {
+            font-size: 0.875rem; /* text-sm */
+            color: #D1D5DB; /* text-gray-300 */
+            font-style: italic;
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen py-10">
+<body class="bg-gray-100 min-h-screen py-10">
 
-    <div class="container w-full max-w-2xl mx-auto p-4 md:p-8">
+    <!-- NOVO: Botão flutuante para abrir a régua -->
+    <button onclick="toggleSidebar()" title="Abrir Régua de Conversão"
+            class="fixed top-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+    </button>
+
+    <!-- NOVO: Overlay para fechar o menu ao clicar fora -->
+    <div id="sidebar-overlay" onclick="toggleSidebar()"
+         class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden transition-opacity duration-300 ease-in-out">
+    </div>
+
+    <!-- NOVO: Sidebar (Régua) COM DESCRIÇÕES -->
+    <div id="sidebar-regua" class="fixed top-0 left-0 h-screen w-80 bg-gray-900 text-gray-200 shadow-xl z-40
+                 transform -translate-x-full transition-transform duration-300 ease-in-out
+                 overflow-y-auto p-5">
+        
+        <!-- Botão de Fechar (dentro) -->
+        <button onclick="toggleSidebar()" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+
+        <h3 class="text-xl font-bold text-white mb-6">Régua de Conversão</h3>
+        
+        <!-- Conteúdo da Régua (tabelas) -->
+        
+        <h4>CH Fina Fria</h4>
+        <!-- DESCRIÇÃO ADICIONADA -->
+        <p>Usada em serralheria leve, móveis de aço, e estamparia (ex: calhas, perfis simples).</p>
+        <table>
+            <thead><tr><th>Bwg</th><th>Mm</th></tr></thead>
+            <tbody>
+                <tr><td>30</td><td>0.30</td></tr>
+                <tr><td>28</td><td>0.38</td></tr>
+                <tr><td>26</td><td>0.45</td></tr>
+                <tr><td>24</td><td>0.60</td></tr>
+                <tr><td>22</td><td>0.75</td></tr>
+                <tr><td>20</td><td>0.90</td></tr>
+                <tr><td>19</td><td>1.06</td></tr>
+                <tr><td>18</td><td>1.20</td></tr>
+                <tr><td>16</td><td>1.50</td></tr>
+            </tbody>
+        </table>
+
+        <h4>CH Fina Quente</h4>
+        <!-- DESCRIÇÃO ADICIONADA -->
+        <p>Para serralheria geral e estruturas que exigem mais resistência (ex: tubos, perfis U).</p>
+        <table>
+            <thead><tr><th>Nº</th><th>Mm</th></tr></thead>
+            <tbody>
+                <tr><td>14</td><td>2.00</td></tr>
+                <tr><td>13</td><td>2.25</td></tr>
+                <tr><td>12</td><td>2.65</td></tr>
+                <tr><td>11</td><td>3.00</td></tr>
+            </tbody>
+        </table>
+
+        <h4>CH Grossa</h4>
+        <!-- DESCRIÇÃO ADICIONADA -->
+        <p>Usada em estruturas pesadas, bases de máquinas, e aplicações de alta resistência.</p>
+        <table>
+            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
+            <tbody>
+                <tr><td>3/16"</td><td>4.75</td></tr>
+                <tr><td>1/4"</td><td>6.30</td></tr>
+                <tr><td>5/16"</td><td>8.00</td></tr>
+                <tr><td>3/8"</td><td>9.50</td></tr>
+                <tr><td>1/2"</td><td>12.50</td></tr>
+            </tbody>
+        </table>
+
+        <h4>CH Galv (Zincada)</h4>
+        <!-- DESCRIÇÃO ADICIONADA -->
+        <p>Chapa com revestimento de zinco para resistência à corrosão (ex: telhas, calhas, portões).</p>
+        <table>
+            <thead><tr><th>Bwg</th><th>Mm</th></tr></thead>
+            <tbody>
+                <tr><td>30</td><td>0.35</td></tr>
+                <tr><td>28</td><td>0.43</td></tr>
+                <tr><td>26</td><td>0.50</td></tr>
+                <tr><td>24</td><td>0.65</td></tr>
+                <tr><td>22</td><td>0.80</td></tr>
+                <tr><td>20</td><td>0.95</td></tr>
+                <tr><td>18</td><td>1.25</td></tr>
+                <tr><td>16</td><td>1.55</td></tr>
+                <tr><td>14</td><td>1.95</td></tr>
+            </tbody>
+        </table>
+
+        <h4>TB Industrial</h4>
+        <!-- DESCRIÇÃO ADICIONADA -->
+        <p>Tubos (redondos, quadrados, retangulares) para serralheria (ex: grades, portões). A polegada é a medida externa real.</p>
+        <table>
+            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
+            <tbody>
+                <tr><td>1/2"</td><td>12.70</td></tr>
+                <tr><td>5/8"</td><td>15.87</td></tr>
+                <tr><td>3/4"</td><td>19.05</td></tr>
+                <tr><td>13/16"</td><td>20.70</td></tr>
+                <tr><td>7/8"</td><td>22.22</td></tr>
+                <tr><td>1"</td><td>25.40</td></tr>
+                <tr><td>1.1/4"</td><td>31.75</td></tr>
+                <tr><td>1.1/2"</td><td>38.10</td></tr>
+                <tr><td>2"</td><td>50.80</td></tr>
+                <tr><td>2.1/2"</td><td>63.50</td></tr>
+                <tr><td>3"</td><td>76.20</td></tr>
+                <tr><td>3.1/2"</td><td>88.90</td></tr>
+                <tr><td>4"</td><td>101.60</td></tr>
+            </tbody>
+        </table>
+
+        <h4>TB PA Dimensão Externa</h4>
+        <!-- DESCRIÇÃO ADICIONADA -->
+        <p>Tubos para condução (ex: NBR 5580). A Polegada é "nominal" (identificação), não a medida externa real.</p>
+        <table>
+            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
+            <tbody>
+                <tr><td>1/2"</td><td>21.20</td></tr>
+                <tr><td>3/4"</td><td>26.70</td></tr>
+                <tr><td>1"</td><td>33.40</td></tr>
+                <tr><td>1.1/4"</td><td>42.40</td></tr>
+                <tr><td>1.1/2"</td><td>48.10</td></tr>
+                <tr><td>2"</td><td>59.90</td></tr>
+                <tr><td>2.1/2"</td><td>76.20</td></tr>
+                <tr><td>3"</td><td>88.90</td></tr>
+            </tbody>
+        </table>
+
+        <h4>Perfil "U" Simples</h4>
+        <!-- DESCRIÇÃO ADICIONADA -->
+        <p>Perfil em "U" sem dobras extras nas abas. Usado em vigas leves e acabamentos.</p>
+        <table>
+            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
+            <tbody>
+                <tr><td>2"</td><td>50 x 25</td></tr>
+                <tr><td>3"</td><td>75 x 40</td></tr>
+                <tr><td>4"</td><td>100 x 40</td></tr>
+                <tr><td>4"</td><td>100 x 50</td></tr>
+                <tr><td>5"</td><td>125 x 50</td></tr>
+                <tr><td>6"</td><td>150 x 50</td></tr>
+            </tbody>
+        </table>
+
+        <h4>Perfil Enrijecido</h4>
+        <!-- DESCRIÇÃO ADICIONADA -->
+        <p>Perfil "U" com dobras adicionais nas abas para maior resistência (ex: terças de telhado).</p>
+        <table>
+            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
+            <tbody>
+                <tr><td>2"</td><td>50 x 25 x 10</td></tr>
+                <tr><td>3"</td><td>75 x 40 x 10</td></tr>
+                <tr><td>4"</td><td>100 x 40 x 15</td></tr>
+                <tr><td>4"</td><td>100 x 50 x 15</td></tr>
+                <tr><td>5"</td><td>127 x 50 x 20</td></tr>
+                <tr><td>6"</td><td>150 x 60 x 20</td></tr>
+            </tbody>
+        </table>
+
+        <h4>Perfil de Encaixe</h4>
+        <!-- DESCRIÇÃO ADICIONADA -->
+        <p>Perfis para sistemas específicos, como portas de aço de enrolar ou divisórias.</p>
+        <table>
+            <thead><tr><th>Mm</th></tr></thead>
+            <tbody>
+                <tr><td>68 x 30</td></tr>
+                <tr><td>93 x 30</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- MUDANÇA: Adicionado 'relative' e 'z-10' para o container principal ficar acima do overlay, mas abaixo do sidebar -->
+    <div class="container w-full max-w-2xl mx-auto p-4 md:p-8 relative z-10">
         <div class="bg-white rounded-lg shadow-xl p-6 md:p-8">
             
             <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Gerador de Cadastro</h1>
@@ -216,21 +429,23 @@
      * Converte a espessura em mm para a Chapa (gauge) correspondente.
      * Focada em Aço Carbono (Ferro).
      */
-    function detectarChapa(espessuraMm) {
-        if (espessuraMm >= 6.0) return 'CH 1/4"';   // 6.35mm
-        if (espessuraMm >= 4.25) return 'CH 3/16"'; // 4.76mm
-        if (espessuraMm >= 2.9) return 'CH 11';     // 3.00mm
-        if (espessuraMm >= 2.5) return 'CH 12';     // 2.65mm
-        if (espessuraMm >= 2.0) return 'CH 14';     // 2.25mm (às vezes 2.0)
-        if (espessuraMm >= 1.8) return 'CH 14';     // 1.90mm
-        if (espessuraMm >= 1.4) return 'CH 16';     // 1.50mm
-        if (espessuraMm >= 1.1) return 'CH 18';     // 1.20mm
-        if (espessuraMm >= 0.85) return 'CH 20';    // 0.90mm
-        if (espessuraMm >= 0.70) return 'CH 22';    // 0.75mm
-        if (espessuraMm >= 0.55) return 'CH 24';    // 0.60mm
-        if (espessuraMm >= 0.40) return 'CH 26';    // 0.45mm
-        return ''; // Sem chapa correspondente
-    }
+    function detectarChapa(espMm) {
+
+    if (espMm >= 5.5) return 'CH 1/4"';       // 6,35 mm
+    if (espMm >= 4.2) return 'CH 3/16"';      // 4,75 mm
+    if (espMm >= 2.8) return 'CH 11';         // 3,05 mm
+    if (espMm >= 2.3) return 'CH 12';         // 2,66 mm
+    if (espMm >= 1.7) return 'CH 14';         // 1,90 mm
+    if (espMm >= 1.3) return 'CH 16';         // 1,52 mm
+    if (espMm >= 1.0) return 'CH 18';         // 1,21 mm
+    if (espMm >= 0.80) return 'CH 20';        // 0,90 mm
+    if (espMm >= 0.65) return 'CH 22';        // 0,75 mm
+    if (espMm >= 0.50) return 'CH 24';        // 0,63 mm
+    if (espMm >= 0.35) return 'CH 26';        // 0,45 mm
+
+    return '';
+}
+
 
     /**
      * Tenta adivinhar o material com base no número de medidas.
@@ -446,11 +661,15 @@
 
             // Exibindo os resultados de forma organizada
             const mmLine = partes.join(' × ') + ' mm';
+            // NOVO: Calcula as polegadas exatas (decimais)
+            const inchExatas = partes.map(v => mmParaInch(v).toFixed(3).replace('.', ',') + '"').join(' × ');
             const inchCom = partes.map(arredondaComercial).join(' × ');
 
             exibirResultado("saida", "Entrada Bruta", txt);
             exibirResultado("saida", "Material", materialDetectado, 'text-blue-700');
             exibirResultado("saida", "Dimensões (mm)", mmLine);
+            // NOVO: Exibe as polegadas exatas
+            exibirResultado("saida", "Dimensões (pol. exatas)", inchExatas);
             exibirResultado("saida", "Dimensões (pol. comercial)", inchCom);
             
             exibirResultado("saida", "Cadastro Sugerido", cadastroSugerido, 'text-green-700 font-bold text-lg mt-2');
@@ -734,12 +953,32 @@
             logContent += `--- Resultados ---\n`;
             // --- LINHAS MODIFICADAS ---
             logContent += `Quantidade Calculada: ${item.quantidadeReal} (Usado: ${item.quantidade})\n`;
-            logContent += `Valor Unitário: ${item.valorUnitarioReal} (Usado: R$ ${item.valorUnitarioTruncado.toFixed(4).replace('.', ',')})\n`;
+            logContent += `Valor Unitário: ${item.valorUnitárioReal} (Usado: R$ ${item.valorUnitarioTruncado.toFixed(4).replace('.', ',')})\n`;
             // --- FIM DAS LINHAS MODIFICADAS ---
             logContent += `========================================\n\n`;
         });
         
         return logContent;
+    }
+
+    /**
+     * NOVO: Controla a exibição da sidebar (régua).
+     */
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar-regua');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        const isOpen = sidebar.classList.contains('translate-x-0');
+        
+        if (isOpen) {
+            sidebar.classList.remove('translate-x-0');
+            sidebar.classList.add('-translate-x-full');
+            overlay.classList.add('hidden');
+        } else {
+            sidebar.classList.remove('-translate-x-full');
+            sidebar.classList.add('translate-x-0');
+            overlay.classList.remove('hidden');
+        }
     }
 
     /**
