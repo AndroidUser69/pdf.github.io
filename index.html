@@ -3,1005 +3,1100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador de Medidas - Ferro, Aço e Alumínio</title>
-    <!-- 1. Adicionando o Tailwind CSS para um visual moderno -->
+    <title>Flashcard Flow - Cloud Pro v1.9.8</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Configuração do Tailwind (opcional, mas bom para fontes)
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                },
-            }
-        }
-    </script>
-    <style>
-        /* Estilo para a fonte Inter */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Classe para o resultado não quebrar linha de forma estranha */
-        .resultado-item {
-            word-break: break-word;
-        }
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-        /* NOVO: Estilos para a tabela da régua */
-        #sidebar-regua table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 1.5rem;
-            font-size: 0.875rem; /* text-sm */
-        }
-        #sidebar-regua th {
-            background-color: #374151; /* bg-gray-700 */
-            color: #FFFFFF; /* text-white */
-            padding: 0.5rem 0.75rem;
-            text-align: left;
-            font-weight: 600; /* font-semibold */
-        }
-        #sidebar-regua td {
-            border-bottom: 1px solid #4B5563; /* border-gray-600 */
-            padding: 0.5rem 0.75rem;
-        }
-        #sidebar-regua tr:last-child td {
-            border-bottom: none;
-        }
-        #sidebar-regua h4 {
-            font-size: 1rem; /* text-base */
-            font-weight: 700; /* font-bold */
-            color: #93C5FD; /* text-blue-300 */
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-            border-bottom: 1px solid #4B5563; /* border-gray-600 */
-            padding-bottom: 0.25rem;
-        }
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, writeBatch, getDocs, deleteField, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.firebaseSDK = {
+            initializeApp, getApps, getApp, getAuth, getFirestore,
+            signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged,
+            doc, setDoc, getDoc, collection, writeBatch, getDocs, deleteField, deleteDoc
+        };
         
-        /* MUDANÇA: Estilo para as novas descrições */
-        #sidebar-regua p {
-            font-size: 0.875rem; /* text-sm */
-            color: #D1D5DB; /* text-gray-300 */
-            font-style: italic;
-            margin-bottom: 0.5rem; /* mb-2 */
-        }
+        window.firebaseLoaded = true;
+        window.dispatchEvent(new Event('firebase-ready'));
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.1); border-radius: 20px; }
+        @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .toast-enter { animation: slideDown 0.3s ease-out forwards; }
+        
+        /* Classe para prevenir seleção de texto durante o redimensionamento */
+        .select-none-important { user-select: none !important; -webkit-user-select: none !important; }
+        .cursor-grab { cursor: grab; }
+        .cursor-grabbing { cursor: grabbing; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen py-10">
+<body>
+    <div id="root"></div>
 
-    <!-- NOVO: Botão flutuante para abrir a régua -->
-    <button onclick="toggleSidebar()" title="Abrir Régua de Conversão"
-            class="fixed top-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-    </button>
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-    <!-- NOVO: Overlay para fechar o menu ao clicar fora -->
-    <div id="sidebar-overlay" onclick="toggleSidebar()"
-         class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden transition-opacity duration-300 ease-in-out">
-    </div>
-
-    <!-- NOVO: Sidebar (Régua) COM DESCRIÇÕES -->
-    <div id="sidebar-regua" class="fixed top-0 left-0 h-screen w-80 bg-gray-900 text-gray-200 shadow-xl z-40
-                 transform -translate-x-full transition-transform duration-300 ease-in-out
-                 overflow-y-auto p-5">
+        // --- CONSTANTES GLOBAIS ---
+        const APP_VERSION = "1.9.8";
+        const STORAGE_KEY = 'flashcardFlowData_v12';
+        const THEME_KEY = 'flashcardFlowTheme_v1';
+        const CONFIG_KEY = 'flashcardFlowConfig_v1';
+        const FIREBASE_CONFIG_FIXED = { apiKey: "AIzaSyApOjZZ75TyDD126CyN4kF7dVeoMvAo5dk", authDomain: "estudos-ec4c5.firebaseapp.com", projectId: "estudos-ec4c5", storageBucket: "estudos-ec4c5.firebasestorage.app", messagingSenderId: "152433763794", appId: "1:152433763794:web:31b8b3fc2f2ee7ae4ed40b", measurementId: "G-YVK8REQRF8" };
+        const DEFAULT_THEME = { frontBg: '#ffffff', frontText: '#1f2937', backBg: '#0f172a', backText: '#e2e8f0', progressColor: '#3b82f6', headerBg: '#ffffff' };
         
-        <!-- Botão de Fechar (dentro) -->
-        <button onclick="toggleSidebar()" class="absolute top-4 right-4 text-gray-400 hover:text-white">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
+        const THEME_KEY_PREFIX = 'flashcardFlowTheme_v1_';
+        const getStorageKey = (u) => `flashcardFlowData_v13_${u ? u.uid : 'guest'}`;
+        const getThemeKey = (u) => `${THEME_KEY_PREFIX}${u ? u.uid : 'guest'}`;
 
-        <h3 class="text-xl font-bold text-white mb-6">Régua de Conversão</h3>
-        
-        <!-- Conteúdo da Régua (tabelas) -->
-        
-        <h4>CH Fina Fria</h4>
-        <!-- DESCRIÇÃO ADICIONADA -->
-        <p>Usada em serralheria leve, móveis de aço, e estamparia (ex: calhas, perfis simples).</p>
-        <table>
-            <thead><tr><th>Bwg</th><th>Mm</th></tr></thead>
-            <tbody>
-                <tr><td>30</td><td>0.30</td></tr>
-                <tr><td>28</td><td>0.38</td></tr>
-                <tr><td>26</td><td>0.45</td></tr>
-                <tr><td>24</td><td>0.60</td></tr>
-                <tr><td>22</td><td>0.75</td></tr>
-                <tr><td>20</td><td>0.90</td></tr>
-                <tr><td>19</td><td>1.06</td></tr>
-                <tr><td>18</td><td>1.20</td></tr>
-                <tr><td>16</td><td>1.50</td></tr>
-            </tbody>
-        </table>
-
-        <h4>CH Fina Quente</h4>
-        <!-- DESCRIÇÃO ADICIONADA -->
-        <p>Para serralheria geral e estruturas que exigem mais resistência (ex: tubos, perfis U).</p>
-        <table>
-            <thead><tr><th>Nº</th><th>Mm</th></tr></thead>
-            <tbody>
-                <tr><td>14</td><td>2.00</td></tr>
-                <tr><td>13</td><td>2.25</td></tr>
-                <tr><td>12</td><td>2.65</td></tr>
-                <tr><td>11</td><td>3.00</td></tr>
-            </tbody>
-        </table>
-
-        <h4>CH Grossa</h4>
-        <!-- DESCRIÇÃO ADICIONADA -->
-        <p>Usada em estruturas pesadas, bases de máquinas, e aplicações de alta resistência.</p>
-        <table>
-            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
-            <tbody>
-                <tr><td>3/16"</td><td>4.75</td></tr>
-                <tr><td>1/4"</td><td>6.30</td></tr>
-                <tr><td>5/16"</td><td>8.00</td></tr>
-                <tr><td>3/8"</td><td>9.50</td></tr>
-                <tr><td>1/2"</td><td>12.50</td></tr>
-            </tbody>
-        </table>
-
-        <h4>CH Galv (Zincada)</h4>
-        <!-- DESCRIÇÃO ADICIONADA -->
-        <p>Chapa com revestimento de zinco para resistência à corrosão (ex: telhas, calhas, portões).</p>
-        <table>
-            <thead><tr><th>Bwg</th><th>Mm</th></tr></thead>
-            <tbody>
-                <tr><td>30</td><td>0.35</td></tr>
-                <tr><td>28</td><td>0.43</td></tr>
-                <tr><td>26</td><td>0.50</td></tr>
-                <tr><td>24</td><td>0.65</td></tr>
-                <tr><td>22</td><td>0.80</td></tr>
-                <tr><td>20</td><td>0.95</td></tr>
-                <tr><td>18</td><td>1.25</td></tr>
-                <tr><td>16</td><td>1.55</td></tr>
-                <tr><td>14</td><td>1.95</td></tr>
-            </tbody>
-        </table>
-
-        <h4>TB Industrial</h4>
-        <!-- DESCRIÇÃO ADICIONADA -->
-        <p>Tubos (redondos, quadrados, retangulares) para serralheria (ex: grades, portões). A polegada é a medida externa real.</p>
-        <table>
-            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
-            <tbody>
-                <tr><td>1/2"</td><td>12.70</td></tr>
-                <tr><td>5/8"</td><td>15.87</td></tr>
-                <tr><td>3/4"</td><td>19.05</td></tr>
-                <tr><td>13/16"</td><td>20.70</td></tr>
-                <tr><td>7/8"</td><td>22.22</td></tr>
-                <tr><td>1"</td><td>25.40</td></tr>
-                <tr><td>1.1/4"</td><td>31.75</td></tr>
-                <tr><td>1.1/2"</td><td>38.10</td></tr>
-                <tr><td>2"</td><td>50.80</td></tr>
-                <tr><td>2.1/2"</td><td>63.50</td></tr>
-                <tr><td>3"</td><td>76.20</td></tr>
-                <tr><td>3.1/2"</td><td>88.90</td></tr>
-                <tr><td>4"</td><td>101.60</td></tr>
-            </tbody>
-        </table>
-
-        <h4>TB PA Dimensão Externa</h4>
-        <!-- DESCRIÇÃO ADICIONADA -->
-        <p>Tubos para condução (ex: NBR 5580). A Polegada é "nominal" (identificação), não a medida externa real.</p>
-        <table>
-            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
-            <tbody>
-                <tr><td>1/2"</td><td>21.20</td></tr>
-                <tr><td>3/4"</td><td>26.70</td></tr>
-                <tr><td>1"</td><td>33.40</td></tr>
-                <tr><td>1.1/4"</td><td>42.40</td></tr>
-                <tr><td>1.1/2"</td><td>48.10</td></tr>
-                <tr><td>2"</td><td>59.90</td></tr>
-                <tr><td>2.1/2"</td><td>76.20</td></tr>
-                <tr><td>3"</td><td>88.90</td></tr>
-            </tbody>
-        </table>
-
-        <h4>Perfil "U" Simples</h4>
-        <!-- DESCRIÇÃO ADICIONADA -->
-        <p>Perfil em "U" sem dobras extras nas abas. Usado em vigas leves e acabamentos.</p>
-        <table>
-            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
-            <tbody>
-                <tr><td>2"</td><td>50 x 25</td></tr>
-                <tr><td>3"</td><td>75 x 40</td></tr>
-                <tr><td>4"</td><td>100 x 40</td></tr>
-                <tr><td>4"</td><td>100 x 50</td></tr>
-                <tr><td>5"</td><td>125 x 50</td></tr>
-                <tr><td>6"</td><td>150 x 50</td></tr>
-            </tbody>
-        </table>
-
-        <h4>Perfil Enrijecido</h4>
-        <!-- DESCRIÇÃO ADICIONADA -->
-        <p>Perfil "U" com dobras adicionais nas abas para maior resistência (ex: terças de telhado).</p>
-        <table>
-            <thead><tr><th>Pol</th><th>Mm</th></tr></thead>
-            <tbody>
-                <tr><td>2"</td><td>50 x 25 x 10</td></tr>
-                <tr><td>3"</td><td>75 x 40 x 10</td></tr>
-                <tr><td>4"</td><td>100 x 40 x 15</td></tr>
-                <tr><td>4"</td><td>100 x 50 x 15</td></tr>
-                <tr><td>5"</td><td>127 x 50 x 20</td></tr>
-                <tr><td>6"</td><td>150 x 60 x 20</td></tr>
-            </tbody>
-        </table>
-
-        <h4>Perfil de Encaixe</h4>
-        <!-- DESCRIÇÃO ADICIONADA -->
-        <p>Perfis para sistemas específicos, como portas de aço de enrolar ou divisórias.</p>
-        <table>
-            <thead><tr><th>Mm</th></tr></thead>
-            <tbody>
-                <tr><td>68 x 30</td></tr>
-                <tr><td>93 x 30</td></tr>
-            </tbody>
-        </table>
-    </div>
-    
-    <!-- MUDANÇA: Adicionado 'relative' e 'z-10' para o container principal ficar acima do overlay, mas abaixo do sidebar -->
-    <div class="container w-full max-w-2xl mx-auto p-4 md:p-8 relative z-10">
-        <div class="bg-white rounded-lg shadow-xl p-6 md:p-8">
-            
-            <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Gerador de Cadastro</h1>
-            <p class="text-gray-600 mb-6">Digite as medidas da nota fiscal (em mm) e selecione o material.</p>
-
-            <div class="space-y-4">
-                
-                <!-- NOVO: Seletor de Material -->
-                <div>
-                    <label for="tipoMaterial" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Material</label>
-                    <select id="tipoMaterial" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-                        <option value="auto">-- Auto-Detectar (Padrão) --</option>
-                        <option value="tubo_retangular">Tubo Quadrado / Retangular</option>
-                        <option value="tubo_redondo">Tubo Redondo (Industrial / Patente)</option>
-                        <option value="cantoneira">Cantoneira (L)</option>
-                        <option value="barra_chata">Barra Chata</option>
-                        <option value="perfil_u">Perfil U (Simples / Enrijecido)</option>
-                        <option value="perfil_i_w">Perfil I / W (Viga)</option>
-                        <option value="chapa">Chapa (Bobina / Pedaço)</option>
-                        <option value="chapa_zincada">Chapa Zincada / Galvanizada</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="entrada" class="block text-sm font-medium text-gray-700 mb-1">Medidas (mm)</label>
-                    <input id="entrada" type="text" 
-                           class="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                           placeholder="Ex: 50x30x2.0 ou 101.6x3.175">
-                </div>
-                
-                <button onclick="processar()" 
-                        class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200">
-                    Gerar Cadastro
-                </button>
-            </div>
-
-            <!-- 2. Área de resultado melhorada -->
-            <div id="saida-container" class="mt-8 border-t border-gray-200 pt-6">
-                <h2 class="text-xl font-semibold text-gray-700 mb-4">Resultado</h2>
-                <div id="saida" class="space-y-3">
-                    <!-- O resultado será inserido aqui pelo JavaScript -->
-                    <p class="text-gray-500">Aguardando entrada...</p>
-                </div>
-            </div>
-
-            <!-- 4. NOVA SEÇÃO: Inclusão no Inventário -->
-            <div id="secao-inclusao" class="mt-6 border-t border-gray-200 pt-6">
-                
-                <!-- Botão para abrir o formulário de inclusão -->
-                <button id="btn-abrir-inclusao" onclick="abrirFormInclusao()"
-                        class="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200 hidden">
-                    + Incluir no Inventário
-                </button>
-
-                <!-- Formulário de Inclusão (inicialmente oculto) -->
-                <div id="form-inclusao" class="hidden space-y-4 p-4 bg-gray-50 rounded-lg shadow-inner">
-                    <h3 class="text-lg font-semibold text-gray-800">Adicionar Item da Nota Fiscal</h3>
-                    <!-- NOVO: Texto de ajuda para decimais -->
-                    <p class="text-sm text-gray-600 -mt-2">Use vírgula (,) ou ponto (.) para casas decimais.</p>
-                    
-                    <div>
-                        <label for="peso-total" class="block text-sm font-medium text-gray-700">Peso Total (Kg)</label>
-                        <!-- MUDANÇA: type="number" para "text" com inputmode="decimal" para aceitar vírgula -->
-                        <input type="text" inputmode="decimal" id="peso-total" placeholder="Ex: 1500,50" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label for="peso-unidade" class="block text-sm font-medium text-gray-700">Peso Unidade (Kg)</label>
-                        <!-- MUDANÇA: type="number" para "text" com inputmode="decimal" -->
-                        <input type="text" inputmode="decimal" id="peso-unidade" placeholder="Ex: 55,30" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label for="valor-total" class="block text-sm font-medium text-gray-700">Valor Total (R$)</label>
-                        <!-- MUDANÇA: type="number" para "text" com inputmode="decimal" -->
-                        <input type="text" inputmode="decimal" id="valor-total" placeholder="Ex: 8540,25" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-
-                    <!-- Mensagem de erro -->
-                    <div id="inclusao-erro" class="text-red-600 text-sm font-medium"></div>
-
-                    <!-- Botões de Ação -->
-                    <div class="flex space-x-4">
-                        <!-- ID alterado para podermos mudar o texto (Confirmar / Salvar Alteração) -->
-                        <button id="btn-confirmar-inclusao" onclick="confirmarInclusao()" class="flex-1 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">Confirmar</button>
-                        <button onclick="cancelarInclusao()" class="flex-1 bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors">Cancelar</button>
-                    </div>
-                    
-                    <!-- NOVO: Campo oculto para guardar o ID do item em edição -->
-                    <input type="hidden" id="edit-item-id">
-                </div>
-            </div>
-
-            <!-- 5. NOVA SEÇÃO: Lista de Itens Incluídos -->
-            <div id="lista-inventario-container" class="mt-8">
-                <!-- NOVO: Botão de Exportar Log -->
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold text-gray-700">Itens Incluídos</h2>
-                    <button id="btn-exportar" onclick="exportarLog()" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg text-sm hover:bg-gray-700 transition-colors hidden">
-                        Exportar Log (.txt)
-                    </button>
-                </div>
-                <div id="lista-inventario" class="space-y-4">
-                    <!-- Itens serão adicionados aqui pela função renderInventario() -->
-                </div>
-            </div>
-
-            <!-- 6. NOVA SEÇÃO: Log Detalhado na Tela -->
-            <div id="log-container" class="mt-8 hidden"> <!-- Começa oculto -->
-                <!-- MUDANÇA: Adicionado botão de toggle -->
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold text-gray-700">Log Detalhado</h2>
-                    <button id="btn-toggle-log" onclick="toggleLog()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">Esconder</button>
-                </div>
-                <pre id="log-na-tela" class="bg-gray-900 text-white p-4 rounded-lg overflow-x-auto text-sm shadow-inner">
-                    <!-- O conteúdo do log será injetado aqui -->
-                </pre>
-            </div>
-
-        </div>
-        
-        <p class="text-center text-gray-500 text-sm mt-6">
-            Nota: A lógica de "Chapa" (CH) é aplicada para Aço/Ferro. Alumínio e Inox geralmente usam a espessura em mm ou polegadas.
-        </p>
-    </div>
-
-<script>
-    // 3. Lógica JavaScript Refatorada e Melhorada
-    
-    // Variável global para guardar o último cadastro gerado
-    let ultimoCadastroSugerido = '';
-    
-    // NOVO: "Banco de dados" em memória para a lista de inventário
-    let inventario = [];
-    let nextId = 0; // Gerador de ID simples
-
-    /**
-     * Converte milímetros para polegadas.
-     */
-    function mmParaInch(valor) {
-        return valor / 25.4;
-    }
-
-    /**
-     * Arredonda o valor em MM para a fração de polegada comercial mais próxima.
-     * Esta é uma versão expandida da sua lógica original.
-     */
-    function arredondaComercial(valorMm) {
-        const inch = mmParaInch(valorMm);
-        
-        // Tolerâncias
-        const tolFracao = 0.02;  // Tolerância justa para frações (aprox 0.5mm)
-        const tolPolegada = 0.15; // Tolerância larga para polegadas cheias
-
-        // Polegadas Cheias (1" a 6") - Expandido
-        if (Math.abs(inch - 1) < tolPolegada) return '1"';
-        if (Math.abs(inch - 1.25) < tolPolegada) return '1.1/4"';
-        if (Math.abs(inch - 1.5) < tolPolegada) return '1.1/2"';
-        if (Math.abs(inch - 1.75) < tolPolegada) return '1.3/4"';
-        if (Math.abs(inch - 2) < tolPolegada) return '2"';
-        if (Math.abs(inch - 2.5) < tolPolegada) return '2.1/2"';
-        if (Math.abs(inch - 3) < tolPolegada) return '3"';
-        if (Math.abs(inch - 4) < tolPolegada) return '4"';
-        if (Math.abs(inch - 5) < tolPolegada) return '5"';
-        if (Math.abs(inch - 6) < tolPolegada) return '6"';
-        
-        // Frações Comuns (1/8" a 1")
-        if (Math.abs(inch - 0.125) < tolFracao) return '1/8"';   // 3.175mm
-        if (Math.abs(inch - 0.1875) < tolFracao) return '3/16"'; // 4.76mm
-        if (Math.abs(inch - 0.25) < tolFracao) return '1/4"';    // 6.35mm
-        if (Math.abs(inch - 0.3125) < tolFracao) return '5/16"'; // 7.93mm
-        if (Math.abs(inch - 0.375) < tolFracao) return '3/8"';   // 9.52mm
-        if (Math.abs(inch - 0.5) < tolFracao) return '1/2"';     // 12.7mm
-        if (Math.abs(inch - 0.625) < tolFracao) return '5/8"';   // 15.87mm
-        if (Math.abs(inch - 0.75) < tolFracao) return '3/4"';    // 19.05mm
-        if (Math.abs(inch - 0.875) < tolFracao) return '7/8"';   // 22.22mm
-
-        // Se não encontrar uma fração exata, retorna a conversão decimal
-        return inch.toFixed(3).replace('.', ',') + '"';
-    }
-
-    /**
-     * Converte a espessura em mm para a Chapa (gauge) correspondente.
-     * Focada em Aço Carbono (Ferro).
-     */
-    function detectarChapa(espMm) {
-
-    if (espMm >= 5.5) return 'CH 1/4"';       // 6,35 mm
-    if (espMm >= 4.2) return 'CH 3/16"';      // 4,75 mm
-    if (espMm >= 2.8) return 'CH 11';         // 3,05 mm
-    if (espMm >= 2.3) return 'CH 12';         // 2,66 mm
-    if (espMm >= 1.7) return 'CH 14';         // 1,90 mm
-    if (espMm >= 1.3) return 'CH 16';         // 1,52 mm
-    if (espMm >= 1.0) return 'CH 18';         // 1,21 mm
-    if (espMm >= 0.80) return 'CH 20';        // 0,90 mm
-    if (espMm >= 0.65) return 'CH 22';        // 0,75 mm
-    if (espMm >= 0.50) return 'CH 24';        // 0,63 mm
-    if (espMm >= 0.35) return 'CH 26';        // 0,45 mm
-
-    return '';
-}
-
-
-    /**
-     * Tenta adivinhar o material com base no número de medidas.
-     * Esta é a lógica "auto"
-     */
-    function autoDetectarMaterial(partes) {
-        const len = partes.length;
-        
-        // --- NOVA LÓGICA ---
-        // Se qualquer parte for maior que 500, é quase certo que é uma chapa
-        if (partes.some(p => p > 500)) {
-            return 'chapa';
-        }
-        // --- FIM DA NOVA LÓGICA ---
-
-        if (len === 4) {
-            // 75x40x15x2.65 -> Provavelmente Perfil U Enrijecido
-            return 'perfil_u';
-        }
-        if (len === 3) {
-            // 50x30x2.0 (Tubo Retangular)
-            // 50x50x3.0 (Tubo Quadrado ou Cantoneira)
-            // 75x40x3.0 (Perfil U Simples ou Cantoneira)
-            // 152x76x5 (Perfil I)
-            if (partes[0] > 100 && partes[1] > 70) return 'perfil_i_w';
-            if (partes[0] === partes[1]) return 'tubo_retangular'; // Suposição (pode ser Cantoneira)
-            return 'tubo_retangular'; // Suposição
-        }
-        if (len === 2) {
-            // 50.8x2.0 (Tubo Redondo)
-            // 50.8x3.175 (Barra Chata)
-            // 1200x2.0 (Chapa) - (Lógica antiga movida para cima)
-            if (partes[0] > 40 && partes[1] > 10) return 'barra_chata'; // Ex: 50.8 x 12.7 (2" x 1/2")
-            if (partes[0] > 40) return 'tubo_redondo'; // Suposição (ex: 50.8x2.0)
-            return 'barra_chata'; // Suposição (ex: 25.4x3.175)
-        }
-        if (len === 1) {
-            // 2.65 (Espessura de chapa)
-            return 'chapa';
-        }
-        return 'auto'; // Falhou em detectar
-    }
-
-    /**
-     * Exibe o resultado formatado na página.
-     */
-    function exibirResultado(id, label, valor, classes = '') {
-        const saidaDiv = document.getElementById(id);
-        const p = document.createElement('p');
-        p.className = `resultado-item ${classes}`;
-        p.innerHTML = `<strong class="font-medium text-gray-700">${label}:</strong> <span class="text-gray-900">${valor}</span>`;
-        saidaDiv.appendChild(p);
-    }
-
-    /**
-     * Função principal que processa a entrada.
-     */
-    function processar() {
-        const txt = document.getElementById("entrada").value.trim();
-        const saidaDiv = document.getElementById("saida");
-        
-        // Limpa resultados anteriores
-        saidaDiv.innerHTML = ''; 
-        
-        // Esconde o botão e o formulário de inclusão ao processar novo item
-        document.getElementById('btn-abrir-inclusao').classList.add('hidden');
-        document.getElementById('form-inclusao').classList.add('hidden');
-        ultimoCadastroSugerido = ''; // Limpa o cadastro anterior
-
-        if (!txt) {
-            saidaDiv.innerHTML = '<p class="text-red-600 font-medium">Formato inválido. Digite as medidas.</p>';
-            return;
-        }
-
-        const partes = txt.split('x').map(v => parseFloat(v.replace(',', '.')));
-
-        if (partes.some(isNaN)) {
-            saidaDiv.innerHTML = '<p class="text-red-600 font-medium">Entrada inválida. Verifique se os números estão corretos.</p>';
-            return;
-        }
-
-        try {
-            let tipoSelecionado = document.getElementById('tipoMaterial').value;
-            let materialDetectado = '';
-            let cadastroSugerido = 'N/A';
-            let chapaDetectada = ''; // Para Tubos/Perfis U
-            let espessuraFracao = ''; // Para Barras/Cantoneiras
-
-            const esp = partes[partes.length - 1];
-            
-            // Auto-detecção se necessário
-            let tipoFinal = tipoSelecionado;
-            if (tipoFinal === 'auto') {
-                tipoFinal = autoDetectarMaterial(partes);
-                materialDetectado = `(Auto-detectado: ${document.querySelector(`#tipoMaterial option[value="${tipoFinal}"]`)?.textContent || 'Falha'})`;
-            } else {
-                 materialDetectado = document.querySelector(`#tipoMaterial option[value="${tipoFinal}"]`).textContent;
+        // --- ERROR BOUNDARY ---
+        class ErrorBoundary extends React.Component {
+            constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+            static getDerivedStateFromError(error) { return { hasError: true, error }; }
+            componentDidCatch(error, errorInfo) { console.error("Critical Error:", error, errorInfo); }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="min-h-screen flex items-center justify-center bg-red-50 p-6 text-center">
+                            <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-xl border border-red-100">
+                                <h2 className="text-2xl font-bold text-red-600 mb-2">Ops! Ocorreu um erro.</h2>
+                                <p className="text-gray-600 mb-4 text-sm">Os dados carregados parecem estar corrompidos ou incompatíveis.</p>
+                                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-colors">Resetar Aplicativo</button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
             }
+        }
 
-            // --- LÓGICA DE CADASTRO POR MATERIAL ---
-            
-            switch (tipoFinal) {
-                case 'tubo_retangular':
-                    // Ex: 50x30x2.0 (3 partes) ou 50x2.0 (2 partes = Quadrado)
-                    chapaDetectada = detectarChapa(esp);
-                    let ladoA = arredondaComercial(partes[0]);
-                    let ladoB = ladoA;
-                    if (partes.length === 3) {
-                        ladoB = arredondaComercial(partes[1]);
-                    } else if (partes.length !== 2) {
-                        throw new Error("Tubo Quadrado/Retangular deve ter 2 ou 3 medidas (Ex: 50x30x2.0 ou 50x2.0)");
-                    }
-                    
-                    let nomeTubo = (ladoA === ladoB) ? 'TUBO QUADRADO' : 'TUBO RETANGULAR';
-                    cadastroSugerido = `${nomeTubo} ${ladoA}${(ladoA !== ladoB ? ' x ' + ladoB : '')} ${chapaDetectada}`;
-                    break;
-
-                case 'tubo_redondo':
-                    // Ex: 50.8x2.0 (2 partes)
-                    if (partes.length !== 2) throw new Error("Tubo Redondo deve ter 2 medidas (Ex: 50.8x2.0)");
-                    chapaDetectada = detectarChapa(esp);
-                    let diametro = arredondaComercial(partes[0]);
-                    cadastroSugerido = `TUBO REDONDO ${diametro} ${chapaDetectada}`;
-                    break;
+        // --- INDEXED DB HELPER ---
+        const DB_NAME = 'FlashcardFlowFiles';
+        const DB_VERSION = 1; 
+        const STORE_NAME = 'files';
+        
+        const dbHelper = {
+            open: () => new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
                 
-                case 'cantoneira':
-                    // Ex: 50.8x50.8x3.175 (3 partes)
-                    // IMPORTANTE: Espessura de cantoneira é em polegada, não CH.
-                    if (partes.length !== 3) throw new Error("Cantoneira deve ter 3 medidas (Ex: 25.4x25.4x3.175)");
-                    let abaA = arredondaComercial(partes[0]);
-                    let abaB = arredondaComercial(partes[1]);
-                    espessuraFracao = arredondaComercial(partes[2]);
-                    cadastroSugerido = `CANTONEIRA L ${abaA}${(abaA !== abaB ? ' x ' + abaB : '')} x ${espessuraFracao}`;
-                    break;
-
-                case 'barra_chata':
-                    // Ex: 25.4x3.175 (2 partes)
-                    // IMPORTANTE: Espessura de barra chata é em polegada, não CH.
-                    if (partes.length !== 2) throw new Error("Barra Chata deve ter 2 medidas (Ex: 25.4x3.175)");
-                    let largura = arredondaComercial(partes[0]);
-                    espessuraFracao = arredondaComercial(partes[1]);
-                    cadastroSugerido = `BARRA CHATA ${largura} x ${espessuraFracao}`;
-                    break;
-
-                case 'perfil_u':
-                    // Ex: 75x40x2.65 (Simples, 3 partes) ou 75x40x15x2.65 (Enrijecido, 4 partes)
-                    chapaDetectada = detectarChapa(esp);
-                    let alma = arredondaComercial(partes[0]);
-                    let aba = arredondaComercial(partes[1]);
-                    let nomePerfil = 'PERFIL U SIMPLES';
-                    if (partes.length === 4) {
-                        nomePerfil = 'PERFIL U ENRIJECIDO';
-                    } else if (partes.length !== 3) {
-                         throw new Error("Perfil U deve ter 3 ou 4 medidas.");
-                    }
-                    cadastroSugerido = `${nomePerfil} ${alma} x ${aba} ${chapaDetectada}`;
-                    break;
-
-                case 'perfil_i_w':
-                    // Ex: 152.4x76.2x4.76 (Alma x Aba x Espessura) - 3 partes
-                    if (partes.length !== 3) throw new Error("Perfil I/W deve ter 3 medidas (Alma x Aba x Espessura Média)");
-                    let almaViga = arredondaComercial(partes[0]);
-                    let abaViga = arredondaComercial(partes[1]);
-                    espessuraFracao = arredondaComercial(partes[2]); // Também em polegada
-                    cadastroSugerido = `PERFIL I/W ${almaViga} x ${abaViga} x ${espessuraFracao}`;
-                    break;
+                request.onupgradeneeded = (event) => { 
+                    const db = event.target.result; 
+                    if (!db.objectStoreNames.contains(STORE_NAME)) { 
+                        db.createObjectStore(STORE_NAME); 
+                    } 
+                };
                 
-                case 'chapa':
-                case 'chapa_zincada':
-                    // --- LÓGICA COMPLETAMENTE REFEITA ---
-                    
-                    // 1. Encontrar a espessura (sempre o menor valor)
-                    const espChapa = Math.min(...partes); // Ex: 1.25 ou 0.95
-                    
-                    // 2. Pegar as outras medidas (dimensões)
-                    const dimensoesMm = partes.filter(p => p !== espChapa); // Ex: [1000] ou [1000, 3000]
-
-                    // 3. Detectar a chapa (gauge) com a espessura correta
-                    let nomeChapa = (tipoFinal === 'chapa_zincada') ? 'CHAPA GALVANIZADA' : 'CHAPA';
-                    chapaDetectada = detectarChapa(espChapa); // Ex: detectarChapa(1.25) -> CH 18
-                    
-                    // 4. Formatar as dimensões em metros
-                    let dimensoesStr = '';
-                    const dimensoesM = dimensoesMm.map(d => (d / 1000)).sort((a, b) => b - a); // Ex: [1] ou [3, 1]
-
-                    if (dimensoesM.length === 2) {
-                        // Ex: 0.95 x 1000 x 3000 -> dimensoesM = [3, 1]
-                        dimensoesStr = `${dimensoesM[0]}x${dimensoesM[1]} m`; // "3x1 m"
-                    } else if (dimensoesM.length === 1) {
-                        // Ex: 1.25 x 1000 -> dimensoesM = [1]
-                        if (dimensoesM[0] === 1) {
-                            dimensoesStr = "2x1 m"; // Seu padrão de 2000x1000
-                        } else if (dimensoesM[0] === 1.2 || dimensoesM[0] === 1.25) {
-                            dimensoesStr = "2.5x1.25 m"; // Outro padrão comum 2500x1250
-                        } else {
-                            dimensoesStr = `${dimensoesM[0]}m (largura)`;
-                        }
+                request.onsuccess = (event) => resolve(event.target.result);
+                
+                request.onerror = (event) => {
+                    if (event.target.error && event.target.error.name === 'VersionError') {
+                        console.warn("Versão do DB incompatível. Resetando DB para garantir compatibilidade com o Leitor...");
+                        event.preventDefault(); 
+                        const delReq = indexedDB.deleteDatabase(DB_NAME);
+                        delReq.onsuccess = () => {
+                            console.log("DB Resetado. Tentando reabrir...");
+                            resolve(dbHelper.open());
+                        };
+                        delReq.onerror = () => reject(new Error("Falha ao resetar DB."));
                     } else {
-                        // Ex: 1.25 (só espessura)
-                        dimensoesStr = '(Dimensões não especificadas)';
+                        reject(event.target.error);
                     }
-                    
-                    // 5. Montar o cadastro (Ex: Chapa galvanizada 18 (1,25 mm) 2x1 m)
-                    cadastroSugerido = `${nomeChapa} ${chapaDetectada} (${espChapa.toString().replace('.', ',')} mm) ${dimensoesStr}`;
-                    break;
-                    // --- FIM DA LÓGICA REFEITA ---
-
-                default:
-                    materialDetectado = 'Não Identificado / Falha no Auto-Detect';
-                    cadastroSugerido = 'N/A - Selecione o material correto na lista.';
+                };
+            }),
+            saveFile: async (id, blob) => { const db = await dbHelper.open(); return new Promise((resolve, reject) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); const request = store.put(blob, id); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); }); },
+            getFile: async (id) => { const db = await dbHelper.open(); return new Promise((resolve, reject) => { const tx = db.transaction(STORE_NAME, 'readonly'); const store = tx.objectStore(STORE_NAME); const request = store.get(id); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); },
+            deleteFile: async (id) => { const db = await dbHelper.open(); return new Promise((resolve, reject) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); const request = store.delete(id); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); }); },
+            exists: async (id) => { 
+                const db = await dbHelper.open();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(STORE_NAME, 'readonly');
+                    const store = tx.objectStore(STORE_NAME);
+                    const request = store.count(id);
+                    request.onsuccess = () => resolve(request.result > 0);
+                    request.onerror = () => reject(request.error);
+                });
             }
+        };
 
-
-            // Exibindo os resultados de forma organizada
-            const mmLine = partes.join(' × ') + ' mm';
-            // NOVO: Calcula as polegadas exatas (decimais)
-            const inchExatas = partes.map(v => mmParaInch(v).toFixed(3).replace('.', ',') + '"').join(' × ');
-            const inchCom = partes.map(arredondaComercial).join(' × ');
-
-            exibirResultado("saida", "Entrada Bruta", txt);
-            exibirResultado("saida", "Material", materialDetectado, 'text-blue-700');
-            exibirResultado("saida", "Dimensões (mm)", mmLine);
-            // NOVO: Exibe as polegadas exatas
-            exibirResultado("saida", "Dimensões (pol. exatas)", inchExatas);
-            exibirResultado("saida", "Dimensões (pol. comercial)", inchCom);
-            
-            exibirResultado("saida", "Cadastro Sugerido", cadastroSugerido, 'text-green-700 font-bold text-lg mt-2');
-
-            // --- NOVA LÓGICA ---
-            // Se o cadastro foi um sucesso, guarda o nome e mostra o botão "+ Incluir"
-            if (cadastroSugerido !== 'N/A - Selecione o material correto na lista.') {
-                ultimoCadastroSugerido = cadastroSugerido;
-                document.getElementById('btn-abrir-inclusao').classList.remove('hidden');
-            }
-            // --- FIM DA NOVA LÓGICA ---
-
-        } catch (error) {
-            console.error(error);
-            saidaDiv.innerHTML = `<p class="text-red-600 font-medium">Ocorreu um erro: ${error.message}</p>`;
-        }
-    }
-
-    // --- FUNÇÕES DA NOVA SEÇÃO DE INCLUSÃO ---
-
-    /**
-     * Mostra o formulário para adicionar dados da nota.
-     */
-    function abrirFormInclusao() {
-        document.getElementById('form-inclusao').classList.remove('hidden');
-        document.getElementById('btn-abrir-inclusao').classList.add('hidden');
-        
-        // Limpa campos e erros anteriores
-        document.getElementById('peso-total').value = '';
-        document.getElementById('peso-unidade').value = '';
-        document.getElementById('valor-total').value = '';
-        document.getElementById('inclusao-erro').textContent = '';
-        
-        // NOVO: Reseta o formulário para o modo "Adicionar"
-        document.getElementById('edit-item-id').value = '';
-        document.getElementById('btn-confirmar-inclusao').textContent = 'Confirmar';
-    }
-
-    /**
-     * Cancela a inclusão e esconde o formulário.
-     */
-    function cancelarInclusao() {
-        document.getElementById('form-inclusao').classList.add('hidden');
-        // Só mostra o botão "+ Incluir" se houver um cadastro sugerido
-        if (ultimoCadastroSugerido) {
-            document.getElementById('btn-abrir-inclusao').classList.remove('hidden');
-        }
-        
-        // NOVO: Reseta o formulário
-        document.getElementById('edit-item-id').value = '';
-        document.getElementById('btn-confirmar-inclusao').textContent = 'Confirmar';
-    }
-
-    /**
-     * Confirma os dados, faz o cálculo e ADICIONA ou ATUALIZA o item na lista.
-     * Esta função foi reescrita para usar o array 'inventario'.
-     */
-    function confirmarInclusao() {
-        const erroDiv = document.getElementById('inclusao-erro');
-        erroDiv.textContent = '';
-
-        // 1. Obter valores
-        // MUDANÇA: Adicionado .replace(',', '.') para aceitar vírgula ou ponto
-        const pesoTotal = parseFloat(document.getElementById('peso-total').value.replace(',', '.'));
-        const pesoUnidade = parseFloat(document.getElementById('peso-unidade').value.replace(',', '.'));
-        const valorTotal = parseFloat(document.getElementById('valor-total').value.replace(',', '.'));
-
-        // 2. Validar
-        if (isNaN(pesoTotal) || isNaN(pesoUnidade) || isNaN(valorTotal)) {
-            erroDiv.textContent = 'Erro: Todos os campos devem ser números.';
-            return;
-        }
-        if (pesoTotal <= 0 || pesoUnidade <= 0 || valorTotal <= 0) {
-            erroDiv.textContent = 'Erro: Os valores devem ser maiores que zero.';
-            return;
-        }
-        if (pesoUnidade > pesoTotal) {
-            erroDiv.textContent = 'Erro: Peso unitário não pode ser maior que o peso total.';
-            return;
-        }
-
-        // 3. Calcular Quantidade (Regra: Truncar decimais)
-        const quantidadeCalculadaReal = pesoTotal / pesoUnidade;
-        const quantidadeUsada = Math.trunc(quantidadeCalculadaReal); // Valor truncado
-
-        if (quantidadeUsada === 0) {
-            erroDiv.textContent = 'Erro: Quantidade calculada é zero. Verifique os pesos.';
-            return;
-        }
-
-        // 4. Calcular Valor Unitário (Regra: Truncar em 4 decimais)
-        const valorUnitarioCalculadoReal = valorTotal / quantidadeUsada;
-        const valorUnitarioUsado = Math.floor(valorUnitarioCalculadoReal * 10000) / 10000; // Valor truncado
-        
-        // 5. Verificar se é "Adicionar" ou "Editar"
-        const editId = document.getElementById('edit-item-id').value;
-
-        if (editId) {
-            // --- MODO EDIÇÃO ---
-            const item = inventario.find(i => i.id === parseInt(editId));
-            if (item) {
-                // Atualiza os valores do item existente
-                item.pesoTotal = pesoTotal;
-                item.pesoUnidade = pesoUnidade;
-                item.valorTotal = valorTotal;
-                // --- NOVOS CAMPOS ---
-                item.quantidadeReal = quantidadeCalculadaReal;
-                item.quantidade = quantidadeUsada;
-                item.valorUnitarioReal = valorUnitarioCalculadoReal;
-                item.valorUnitarioTruncado = valorUnitarioUsado;
-            }
-        } else {
-            // --- MODO ADIÇÃO ---
-            const novoItem = {
-                id: nextId++,
-                nome: ultimoCadastroSugerido,
-                pesoTotal: pesoTotal,
-                pesoUnidade: pesoUnidade,
-                valorTotal: valorTotal,
-                // --- NOVOS CAMPOS ---
-                quantidadeReal: quantidadeCalculadaReal,
-                quantidade: quantidadeUsada, // O truncado
-                valorUnitarioReal: valorUnitarioCalculadoReal,
-                valorUnitarioTruncado: valorUnitarioUsado // O truncado
+        // --- ICON HELPER ---
+        const Icon = ({ name, size = 24, className, onClick }) => {
+            const props = { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className, onClick };
+            const paths = {
+                upload: <g><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></g>,
+                chevronLeft: <path d="m15 18-6-6 6-6"/>,
+                chevronRight: <path d="m9 18 6-6-6-6"/>,
+                rotateCw: <g><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></g>,
+                rotateCcw: <g><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></g>,
+                minus: <line x1="5" y1="12" x2="19" y2="12" />,
+                filePlus: <g><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" x2="12" y1="18" y2="12"/><line x1="9" x2="15" y1="15" y2="15"/></g>,
+                folderPlus: <g><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"/><line x1="12" x2="12" y1="10" y2="16"/><line x1="9" x2="15" y1="13" y2="13"/></g>,
+                trash2: <g><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></g>,
+                arrowUp: <path d="m18 15-6-6-6 6"/>, 
+                arrowDown: <path d="m6 9 6 6 6-6"/>,
+                settings: <g><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></g>,
+                x: <g><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></g>,
+                check: <polyline points="20 6 9 17 4 12"/>,
+                play: <polygon points="5 3 19 12 5 21 5 3"/>,
+                edit2: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>,
+                barChart: <g><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></g>,
+                download: <g><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></g>,
+                uploadCloud: <g><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/><polyline points="16 16 12 12 8 16"/></g>,
+                cpu: <g><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></g>,
+                database: <g><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></g>,
+                trophy: <g><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></g>,
+                search: <g><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></g>,
+                folder: <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"/>,
+                folderOpen: <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"/>, 
+                copy: <g><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></g>,
+                scissors: <g><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></g>,
+                clipboard: <g><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></g>,
+                moreVertical: <g><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></g>,
+                cornerUpLeft: <g><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></g>,
+                home: <g><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></g>,
+                plus: <g><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></g>,
+                fileText: <g><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></g>,
+                cloud: <g><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></g>,
+                user: <g><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g>,
+                logOut: <g><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></g>,
+                key: <g><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></g>,
+                helpCircle: <g><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></g>,
+                logIn: <g><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></g>,
+                wifi: <g><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></g>,
+                wifiOff: <g><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></g>,
+                pdf: <g><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></g>,
+                video: <g><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></g>,
+                image: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></g>,
+                filter: <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
             };
-            // Adiciona o novo item no início da lista (prepend)
-            inventario.push(novoItem); 
-        }
+            const key = Object.keys(paths).find(k => k.toLowerCase() === name.replace(/-/g, '').toLowerCase());
+            return <svg {...props}>{paths[key] || <circle cx="12" cy="12" r="10"/>}</svg>;
+        };
 
-        // 6. Redesenhar a lista inteira
-        renderInventario();
+        const AuthScreen = ({ onLogin, onGuest }) => {
+            const [isRegister, setIsRegister] = useState(false);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [showHelp, setShowHelp] = useState(false);
 
-        // 7. Fechar e resetar o formulário
-        cancelarInclusao();
-    }
+            const handleAuth = async (e) => {
+                e.preventDefault(); setError(''); setLoading(true);
+                const { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = window.firebaseAppObj; 
+                if (!auth) { setError("Erro interno de Auth."); setLoading(false); return; }
+                try {
+                    let userCredential;
+                    if (isRegister) userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    else userCredential = await signInWithEmailAndPassword(auth, email, password);
+                    if (userCredential && userCredential.user && onLogin) onLogin(userCredential.user);
+                } catch (err) { setError(err.message); setLoading(false); }
+            };
 
-    /**
-     * NOVO: Desenha a lista de inventário no HTML.
-     */
-    function renderInventario() {
-        const listaDiv = document.getElementById('lista-inventario');
-        listaDiv.innerHTML = ''; // Limpa a lista antiga
-
-        // NOVO: Seleciona o container do Log
-        const logContainer = document.getElementById('log-container');
-        const logNaTela = document.getElementById('log-na-tela');
-
-        // Mostra ou esconde o botão de exportar
-        if (inventario.length > 0) {
-            document.getElementById('btn-exportar').classList.remove('hidden');
-            // NOVO: Mostra o log na tela e o preenche
-            logContainer.classList.remove('hidden');
-            logNaTela.textContent = gerarLogContent();
-            
-            // NOVO: Reseta o estado do botão toggle
-            document.getElementById('log-na-tela').classList.remove('hidden');
-            document.getElementById('btn-toggle-log').textContent = 'Esconder';
-
-        } else {
-            document.getElementById('btn-exportar').classList.add('hidden');
-            // NOVO: Esconde o log na tela e o limpa
-            logContainer.classList.add('hidden');
-            logNaTela.textContent = '';
-            listaDiv.innerHTML = '<p class="text-gray-500">Nenhum item incluído.</p>';
-            return;
-        }
-
-        // Adiciona cada item do array no HTML
-        inventario.forEach((item, index) => {
-            const valorUnitarioStr = item.valorUnitarioTruncado.toFixed(4).replace('.', ',');
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'py-4 border-b border-gray-200';
-            itemDiv.setAttribute('data-item-id', item.id);
-            
-            // Desabilita botões de mover se estiver no topo ou no fim
-            const upDisabled = (index === 0) ? 'disabled' : '';
-            const downDisabled = (index === inventario.length - 1) ? 'disabled' : '';
-
-            itemDiv.innerHTML = `
-                <p class="font-bold text-gray-800">${item.nome}</p>
-                <p class="text-gray-600">
-                    <span class="font-medium">un:</span> ${item.quantidade}, 
-                    <span class="font-medium">valor unitário:</span> R$ ${valorUnitarioStr}
-                </p>
-                <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
-                    <!-- Botões de Ação -->
-                    <button onclick="iniciarAlteracao(${item.id})" class="text-blue-600 hover:text-blue-800 font-medium">Alterar</button>
-                    <button onclick="excluirItem(${item.id})" class="text-red-600 hover:text-red-800 font-medium">Excluir</button>
-                    <!-- Botões de Posição -->
-                    <button onclick="moverItem(${item.id}, 'up')" class="text-gray-500 hover:text-gray-800 ${upDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${upDisabled}>&#9650; Mover Cima</button>
-                    <button onclick="moverItem(${item.id}, 'down')" class="text-gray-500 hover:text-gray-800 ${downDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${downDisabled}>&#9660; Mover Baixo</button>
+            const HelpModal = () => (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white p-6 rounded-xl max-w-md w-full relative max-h-[90vh] overflow-y-auto">
+                        <button onClick={() => setShowHelp(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><Icon name="x" size={24} /></button>
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icon name="settings" size={24} /> Configuração do Firebase</h2>
+                        <ol className="list-decimal pl-5 space-y-3 text-sm text-gray-600"><li>Acesse o <b>Firebase Console</b> e selecione seu projeto.</li><li><strong>Ativar Login:</strong><ul className="list-disc pl-5 mt-1"><li>Vá em <i>Criação (Build)</i> &gt; <i>Authentication</i>.</li><li>Na aba <i>Sign-in method</i>, ative <b>Email/Password</b>.</li></ul></li><li><strong>Ativar Banco de Dados:</strong><ul className="list-disc pl-5 mt-1"><li>Vá em <i>Criação</i> &gt; <i>Firestore Database</i>.</li><li>Clique em <i>Create Database</i> e escolha <b>Test Mode</b>.</li></ul></li></ol>
+                        <button onClick={() => setShowHelp(false)} className="w-full mt-6 py-2 bg-blue-600 text-white rounded-lg">Entendi</button>
+                    </div>
                 </div>
-            `;
-            listaDiv.appendChild(itemDiv);
-        });
-    }
+            );
 
-    /**
-     * NOVO: Prepara o formulário para editar um item.
-     */
-    function iniciarAlteracao(id) {
-        const item = inventario.find(i => i.id === id);
-        if (!item) return;
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-gray-200 relative">
+                        <div className="absolute top-4 right-4 flex gap-2"><button onClick={() => setShowHelp(true)} className="text-gray-300 hover:text-blue-500" title="Ajuda"><Icon name="helpCircle" size={20} /></button></div>
+                        <div className="text-center mb-8"><div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-lg"><Icon name="layers" size={32} /></div><h1 className="text-2xl font-bold text-gray-800">Flashcard Flow</h1><p className="text-gray-500 text-sm">Seus estudos nas nuvens.</p><p className="text-xs text-gray-400 mt-1">versão {APP_VERSION}</p></div>
+                        {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg">{error}</div>}
+                        <form onSubmit={handleAuth} className="space-y-4"><div><label className="block text-xs font-bold text-gray-700 uppercase mb-1">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="seu@email.com" required /></div><div><label className="block text-xs font-bold text-gray-700 uppercase mb-1">Senha</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••" required /></div><button type="submit" disabled={loading} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2">{loading ? "..." : (isRegister ? "Criar Conta" : "Entrar")}</button></form>
+                        <div className="mt-6 flex flex-col gap-3"><button onClick={() => setIsRegister(!isRegister)} className="text-sm text-blue-600 hover:underline text-center">{isRegister ? "Já tem conta? Entrar" : "Criar conta"}</button><div className="relative flex py-2 items-center"><div className="flex-grow border-t border-gray-200"></div><span className="flex-shrink-0 mx-4 text-gray-400 text-xs">OU</span><div className="flex-grow border-t border-gray-200"></div></div><button onClick={onGuest} className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-600 font-medium rounded-lg border border-gray-200 text-sm">Continuar sem conta</button></div>
+                        {showHelp && <HelpModal />}
+                    </div>
+                </div>
+            );
+        };
 
-        // Mostra o formulário
-        document.getElementById('form-inclusao').classList.remove('hidden');
-        document.getElementById('btn-abrir-inclusao').classList.add('hidden');
+        const App = () => {
+            const [appReady, setAppReady] = useState(false); 
+            const [user, setUser] = useState(null);
+            const [isGuest, setIsGuest] = useState(false);
+            const [connectionLog, setConnectionLog] = useState(null);
+            const [items, setItems] = useState([]);
+            const [lastCloudSave, setLastCloudSave] = useState(null);
+            const [currentFolderId, setCurrentFolderId] = useState(null);
+            const [activeDeckId, setActiveDeckId] = useState(null);
+            const [clipboard, setClipboard] = useState(null); 
+            const [forceExplorer, setForceExplorer] = useState(false);
+            const [showNewMenu, setShowNewMenu] = useState(false);
+            const [currentCardIndex, setCurrentCardIndex] = useState(0);
+            const [isFlipped, setIsFlipped] = useState(false);
+            const [showCompletionModal, setShowCompletionModal] = useState(false);
+            const [theme, setTheme] = useState(DEFAULT_THEME);
+            const [showQueue, setShowQueue] = useState(true);
+            const [showSettings, setShowSettings] = useState(false);
+            const [showStats, setShowStats] = useState(false);
+            const [saveStatus, setSaveStatus] = useState('');
+            const [editingItemId, setEditingItemId] = useState(null);
+            const [tempName, setTempName] = useState("");
+            const [pdfUrl, setPdfUrl] = useState(null);
+            const [pdfMissing, setPdfMissing] = useState(false);
+            const [imageZoom, setImageZoom] = useState(1);
+            
+            // --- Estados para Pan (Arrastar Imagem) ---
+            const [imagePos, setImagePos] = useState({ x: 0, y: 0 });
+            const [isDraggingImage, setIsDraggingImage] = useState(false);
+            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-        // Preenche com os dados do item
-        document.getElementById('peso-total').value = item.pesoTotal;
-        document.getElementById('peso-unidade').value = item.pesoUnidade;
-        document.getElementById('valor-total').value = item.valorTotal;
-        
-        // Define o modo de edição
-        document.getElementById('edit-item-id').value = id;
-        document.getElementById('btn-confirmar-inclusao').textContent = 'Salvar Alteração';
+            // --- Estados de Redimensionamento da Sidebar ---
+            const [sidebarWidth, setSidebarWidth] = useState(384); 
+            const [isResizing, setIsResizing] = useState(false);
+            const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
 
-        // Rola a tela para o formulário
-        document.getElementById('form-inclusao').scrollIntoView({ behavior: 'smooth' });
-    }
+            // --- Estados de Filtro (RESTAURADO) ---
+            const [showFilterMenu, setShowFilterMenu] = useState(false);
+            const [activeFilters, setActiveFilters] = useState([]);
 
-    /**
-     * NOVO: Exclui um item da lista.
-     */
-    function excluirItem(id) {
-        // Confirmação simples (descomente se quiser uma confirmação)
-        // if (!confirm('Tem certeza que deseja excluir este item?')) {
-        //     return;
-        // }
-        inventario = inventario.filter(i => i.id !== id);
-        renderInventario();
-    }
+            const fileInputRef = useRef(null);
+            const importInputRef = useRef(null);
+            const editInputRef = useRef(null);
+            const restorePdfRef = useRef(null);
 
-    /**
-     * NOVO: Move um item para cima ou para baixo.
-     */
-    function moverItem(id, direcao) {
-        const index = inventario.findIndex(i => i.id === id);
+            const getEmbedUrl = (url) => {
+                if (!url) return '';
+                const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+                const match = url.match(youtubeRegex);
+                if (match && match[1]) {
+                    return `https://www.youtube.com/embed/${match[1]}`;
+                }
+                return url;
+            };
 
-        if (direcao === 'up' && index > 0) {
-            // Troca com o item anterior
-            [inventario[index - 1], inventario[index]] = [inventario[index], inventario[index - 1]];
-        } else if (direcao === 'down' && index < inventario.length - 1) {
-            // Troca com o próximo item
-            [inventario[index + 1], inventario[index]] = [inventario[index], inventario[index + 1]];
-        }
-        
-        renderInventario();
-    }
+            const getHostname = (url) => {
+                try {
+                    return new URL(url).hostname.replace('www.', '');
+                } catch (e) {
+                    return 'url';
+                }
+            };
 
-    /**
-     * NOVO: Mostra ou esconde o <pre> do log na tela.
-     */
-    function toggleLog() {
-        const logPre = document.getElementById('log-na-tela');
-        const btn = document.getElementById('btn-toggle-log');
-        if (logPre.classList.contains('hidden')) {
-            logPre.classList.remove('hidden');
-            btn.textContent = 'Esconder';
-        } else {
-            logPre.classList.add('hidden');
-            btn.textContent = 'Mostrar';
-        }
-    }
+            useEffect(() => {
+                const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
 
-    /**
-     * NOVO: Gera o conteúdo de texto para o Log.
-     * Esta função agora é usada tanto pela exportação quanto pela exibição na tela.
-     */
-    function gerarLogContent() {
-        let logContent = 'Log de Inventário - ' + new Date().toLocaleString('pt-BR') + '\n\n';
+            const startResizing = useCallback((e) => {
+                e.preventDefault();
+                setIsResizing(true);
+            }, []);
 
-        // Itera na ordem inversa (do mais antigo para o mais novo) para o log
-        inventario.forEach(item => {
-            logContent += `========================================\n`;
-            logContent += `Item: ${item.nome}\n`;
-            logContent += `--- Inputs da Calculadora ---\n`;
-            logContent += `Peso Total (Kg): ${item.pesoTotal}\n`;
-            logContent += `Peso Unidade (Kg): ${item.pesoUnidade}\n`;
-            logContent += `Valor Total (R$): ${item.valorTotal}\n`;
-            logContent += `--- Resultados ---\n`;
-            // --- LINHAS MODIFICADAS ---
-            logContent += `Quantidade Calculada: ${item.quantidadeReal} (Usado: ${item.quantidade})\n`;
-            logContent += `Valor Unitário: ${item.valorUnitárioReal} (Usado: R$ ${item.valorUnitarioTruncado.toFixed(4).replace('.', ',')})\n`;
-            // --- FIM DAS LINHAS MODIFICADAS ---
-            logContent += `========================================\n\n`;
-        });
-        
-        return logContent;
-    }
+            useEffect(() => {
+                const resize = (e) => {
+                    if (isResizing) {
+                        let newWidth = document.body.clientWidth - e.clientX;
+                        if (newWidth < 250) newWidth = 250;
+                        if (newWidth > 800) newWidth = 800;
+                        setSidebarWidth(newWidth);
+                    }
+                };
+                const stopResizing = () => { setIsResizing(false); };
+                if (isResizing) {
+                    window.addEventListener('mousemove', resize);
+                    window.addEventListener('mouseup', stopResizing);
+                    document.body.classList.add('select-none-important');
+                    document.body.style.cursor = 'ew-resize';
+                } else {
+                    document.body.classList.remove('select-none-important');
+                    document.body.style.cursor = 'default';
+                }
+                return () => {
+                    window.removeEventListener('mousemove', resize);
+                    window.removeEventListener('mouseup', stopResizing);
+                    document.body.classList.remove('select-none-important');
+                    document.body.style.cursor = 'default';
+                };
+            }, [isResizing]);
 
-    /**
-     * NOVO: Controla a exibição da sidebar (régua).
-     */
-    function toggleSidebar() {
-        const sidebar = document.getElementById('sidebar-regua');
-        const overlay = document.getElementById('sidebar-overlay');
-        
-        const isOpen = sidebar.classList.contains('translate-x-0');
-        
-        if (isOpen) {
-            sidebar.classList.remove('translate-x-0');
-            sidebar.classList.add('-translate-x-full');
-            overlay.classList.add('hidden');
-        } else {
-            sidebar.classList.remove('-translate-x-full');
-            sidebar.classList.add('translate-x-0');
-            overlay.classList.remove('hidden');
-        }
-    }
+            const handleImageMouseDown = (e) => {
+                e.preventDefault();
+                setIsDraggingImage(true);
+                setDragStart({ x: e.clientX - imagePos.x, y: e.clientY - imagePos.y });
+            };
 
-    /**
-     * NOVO: Gera e baixa um arquivo .txt com o log do inventário.
-     * (Agora usa a função gerarLogContent)
-     */
-    function exportarLog() {
-        // 1. Gera o conteúdo do log
-        const logContent = gerarLogContent();
+            const handleImageMouseMove = (e) => {
+                if (!isDraggingImage) return;
+                e.preventDefault();
+                setImagePos({
+                    x: e.clientX - dragStart.x,
+                    y: e.clientY - dragStart.y
+                });
+            };
 
-        // 2. Cria e baixa o arquivo
-        const blob = new Blob([logContent], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'log_inventario.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
+            const handleImageMouseUp = () => {
+                setIsDraggingImage(false);
+            };
 
-</script>
+            const resetImage = () => {
+                setImageZoom(1);
+                setImagePos({ x: 0, y: 0 });
+            };
 
+            // Sanitização de dados ao carregar
+            const sanitizeItems = (rawItems) => {
+                if (!Array.isArray(rawItems)) return [];
+                return rawItems.map(item => {
+                    if (item.type === 'deck') {
+                        return { 
+                            ...item, 
+                            cards: Array.isArray(item.cards) ? item.cards : [],
+                            progress: Number(item.progress) || 0,
+                            completions: Number(item.completions) || 0
+                        };
+                    }
+                    return item;
+                });
+            };
+
+            const countItemsInFolder = (folderId) => {
+                if (!Array.isArray(items)) return 0;
+                return items.filter(i => i.parentId === folderId).length;
+            };
+            
+            const showToast = (type, msg) => { setConnectionLog({ type, msg }); setTimeout(() => setConnectionLog(null), 4000); };
+            const readFileAsText = (file) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = (e) => resolve(e.target.result); r.onerror = reject; r.readAsText(file); });
+            const parseCSV = (text) => { const lines = text.split('\n').filter(l => l.trim() !== ''); const parseLine = (t) => { const res = []; let cell = ''; let q = false; for(let i=0;i<t.length;i++){ if(t[i]==='"'){ if(q && t[i+1]==='"'){cell+='"';i++}else{q=!q} } else if(t[i]===',' && !q){ res.push(cell.trim()); cell='' } else cell+=t[i]; } res.push(cell.trim()); return res; }; return lines.map((l,i) => { const p = parseLine(l); if(p.length<2 || (i===0 && p[0].toLowerCase().includes('pergunta'))) return null; return { front: p[0], back: p[1] }; }).filter(Boolean); };
+            const getStorageSize = () => { try { return (JSON.stringify(localStorage).length / 1024).toFixed(2); } catch(e) { return 0; } };
+            const getMemoryUsage = () => window.performance?.memory ? Math.round(window.performance.memory.usedJSHeapSize / 1024 / 1024) : null;
+            
+            // --- NOVO saveToCloud: Usa Subcoleção e Batches (1MB+ Scalable) ---
+            const saveToCloud = async (currItems = items, currTheme = theme) => { 
+                if (!user || isGuest || !window.firebaseAppObj) return; 
+                
+                const { db, doc, setDoc, writeBatch, collection, getDocs, deleteField } = window.firebaseAppObj; 
+                setSaveStatus('saving'); 
+                
+                try { 
+                    const appId = window.firebaseAppObj.config.projectId; 
+                    const userRoot = `artifacts/${appId}/users/${user.uid}/data/backup`;
+                    const itemsCollectionRef = collection(db, 'artifacts', appId, 'users', user.uid, 'data', 'backup', 'items');
+
+                    // 1. Salvar Metadados (Tema, Timestamp, Versão App) no documento raiz
+                    // NOTA: removemos 'items' array daqui para economizar espaço
+                    const rootRef = doc(db, userRoot);
+                    await setDoc(rootRef, { 
+                        theme: currTheme, 
+                        timestamp: Date.now(),
+                        appVersion: APP_VERSION,
+                        // Opcional: flag para indicar que os itens migraram
+                        migratedToSubcollection: true,
+                        // Remove o array antigo se existir para liberar espaço
+                        items: deleteField() 
+                    }, { merge: true });
+
+                    // 2. Salvar Itens na Subcoleção usando Batches (Limite 500 ops por batch)
+                    // Estratégia simples: Sobrescrever todos (Upsert). 
+                    // Para deletar itens removidos, o ideal seria ler primeiro ou ter um log de deletados.
+                    // Para este "Backup", vamos focar em garantir que o que está na tela vá para a nuvem.
+                    
+                    const chunkSize = 450; // Margem de segurança (limite é 500)
+                    for (let i = 0; i < currItems.length; i += chunkSize) {
+                        const chunk = currItems.slice(i, i + chunkSize);
+                        const batch = writeBatch(db);
+                        
+                        chunk.forEach(item => {
+                            // Cria uma referência para o documento do item
+                            const itemRef = doc(itemsCollectionRef, String(item.id)); 
+                            batch.set(itemRef, item);
+                        });
+
+                        await batch.commit();
+                    }
+
+                    setLastCloudSave(new Date()); 
+                    setSaveStatus('saved_cloud'); 
+                    setTimeout(() => setSaveStatus(''), 3000); 
+                } catch (e) { 
+                    console.error("Erro ao salvar:", e); 
+                    setSaveStatus('error'); 
+                    showToast('error', 'Erro ao salvar na nuvem.'); 
+                } 
+            };
+
+            const handleExportData = () => { const data = { items, theme, timestamp: Date.now(), appVersion: '3.0' }; const blob = new Blob([JSON.stringify(data)], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup_flashcards_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
+            
+            // --- CORREÇÃO DA IMPORTAÇÃO ---
+            const handleImportData = async (event) => {
+                const file = event.target.files[0];
+                if(!file) return;
+                try {
+                    const text = await readFileAsText(file);
+                    const data = JSON.parse(text);
+                    
+                    if(Array.isArray(data.items) || (data.decks && Array.isArray(data.decks))) {
+                        const rawImport = data.items || data.decks;
+                        const msg = user ? "Deseja substituir seus dados atuais e salvar na nuvem? (Cancel para mesclar)" : "Deseja substituir seus dados atuais? (Cancel para cancelar)";
+                        const shouldReplace = confirm(msg);
+
+                        let newItems = [];
+
+                        if (shouldReplace) {
+                            newItems = rawImport.map(d => ({ 
+                                ...d, 
+                                id: d.id || Date.now() + Math.random(), 
+                                type: d.type || 'deck', 
+                                parentId: d.parentId || null, 
+                                completions: d.completions || 0, 
+                                progress: d.progress || 0 
+                            })); 
+                        } else if (user) {
+                            const idMap = {};
+                            const remapped = rawImport.map(d => {
+                                const newId = Date.now().toString() + Math.random();
+                                idMap[d.id] = newId;
+                                return { ...d, oldId: d.id, id: newId };
+                            });
+                            const finalImport = remapped.map(d => ({
+                                ...d,
+                                type: d.type || 'deck',
+                                parentId: idMap[d.parentId] || null, 
+                                completions: d.completions || 0,
+                                progress: d.progress || 0
+                            }));
+                            newItems = [...items, ...finalImport];
+                        } else {
+                            return; 
+                        }
+
+                        setItems(sanitizeItems(newItems));
+                        setCurrentFolderId(null);
+                        setActiveDeckId(null);
+                        
+                        if(data.theme && shouldReplace) setTheme(data.theme);
+                        
+                        if (user) { 
+                            saveToCloud(newItems, (data.theme && shouldReplace) ? data.theme : theme); 
+                        }
+                        
+                        alert("Importação concluída!");
+                        setShowStats(false);
+                    } else {
+                        alert("Arquivo inválido.");
+                    }
+                } catch (e) {
+                    alert("Erro: " + e.message);
+                }
+                event.target.value = '';
+            };
+
+            const clearAllData = () => { if(confirm("Isso apagará TODOS os arquivos. Tem certeza?")) { setItems([]); setCurrentFolderId(null); setActiveDeckId(null); setCurrentCardIndex(0); localStorage.removeItem(getStorageKey(user)); setTheme(DEFAULT_THEME); saveToCloud([], DEFAULT_THEME); setShowStats(false); } };
+            const handleThemeChange = (k, v) => setTheme(p => ({...p, [k]: v}));
+            const resetTheme = () => setTheme(DEFAULT_THEME);
+
+            // Data Loading
+            useEffect(() => {
+                if (!appReady) return; 
+                const key = getStorageKey(user);
+                const themeKey = getThemeKey(user);
+                try {
+                    const savedItems = localStorage.getItem(key);
+                    if (savedItems) setItems(sanitizeItems(JSON.parse(savedItems))); else setItems([]); 
+                    const savedTheme = localStorage.getItem(themeKey);
+                    if (savedTheme) setTheme(JSON.parse(savedTheme)); else setTheme(DEFAULT_THEME);
+                    setCurrentFolderId(null); setActiveDeckId(null); setCurrentCardIndex(0); setLastCloudSave(null);
+                } catch (e) { console.error(e); }
+            }, [user, appReady]);
+
+            // --- NOVO loadFromCloud: Suporta Híbrido (Array Antigo ou Subcoleção Nova) ---
+            const loadFromCloud = async (currentUser, dbInstance) => {
+                const { doc, getDoc, collection, getDocs } = window.firebaseSDK;
+                const appId = window.firebaseAppObj.config.projectId;
+                
+                try {
+                    // 1. Tenta carregar Metadados
+                    const ref = doc(dbInstance, 'artifacts', appId, 'users', currentUser.uid, 'data', 'backup');
+                    const snap = await getDoc(ref);
+                    
+                    let cloudItems = [];
+                    let cloudTheme = null;
+                    let cloudTime = null;
+
+                    if (snap.exists()) {
+                        const d = snap.data();
+                        cloudTheme = d.theme;
+                        cloudTime = d.timestamp;
+
+                        // 2. Verifica se existem itens na Subcoleção (Formato Novo)
+                        const itemsCollectionRef = collection(dbInstance, 'artifacts', appId, 'users', currentUser.uid, 'data', 'backup', 'items');
+                        const itemsSnap = await getDocs(itemsCollectionRef);
+                        
+                        if (!itemsSnap.empty) {
+                            console.log("Carregando do formato novo (Subcoleção)...");
+                            cloudItems = itemsSnap.docs.map(doc => doc.data());
+                        } else if (d.items && Array.isArray(d.items)) {
+                            // 3. Fallback: Se subcoleção vazia, tenta array antigo (Migração)
+                            console.log("Carregando do formato antigo (Array)...");
+                            cloudItems = d.items;
+                        }
+                    }
+
+                    if (cloudItems.length > 0) {
+                        if (confirm(`Backup encontrado na nuvem (${cloudItems.length} itens). Deseja carregar?`)) {
+                            setItems(sanitizeItems(cloudItems)); 
+                            if (cloudTheme) setTheme(cloudTheme);
+                            if (cloudTime) setLastCloudSave(new Date(cloudTime));
+                        }
+                    }
+                } catch (e) { console.error("Erro ao carregar da nuvem:", e); }
+            };
+
+            const initializeFirebaseApp = () => {
+                // Ensure writeBatch, getDocs, deleteField are included here
+                const { initializeApp, getAuth, getFirestore, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, doc, setDoc, getDoc, collection, getApps, getApp, writeBatch, getDocs, deleteField, deleteDoc } = window.firebaseSDK;
+                try {
+                    let app;
+                    if (getApps().length > 0) app = getApp(); 
+                    else app = initializeApp(FIREBASE_CONFIG_FIXED);
+                    const auth = getAuth(app);
+                    const db = getFirestore(app);
+                    window.firebaseAppObj = { auth, db, config: FIREBASE_CONFIG_FIXED, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, doc, setDoc, getDoc, collection, writeBatch, getDocs, deleteField, deleteDoc };
+                    onAuthStateChanged(auth, (u) => {
+                        if (u) { setUser(u); setIsGuest(false); showToast('success', 'Conectado como ' + u.email); loadFromCloud(u, db); } 
+                        else { setUser(null); }
+                    });
+                } catch (e) { console.error("Init failed", e); showToast('error', 'Falha ao conectar Firebase'); }
+            };
+            
+            useEffect(() => {
+                const start = async () => {
+                    let retries = 0;
+                    while (!window.firebaseLoaded && retries < 20) { await new Promise(r => setTimeout(r, 100)); retries++; }
+                    if (!window.firebaseLoaded) { setIsGuest(true); setAppReady(true); showToast('error', 'Offline'); return; }
+                    initializeFirebaseApp();
+                    setAppReady(true);
+                };
+                start();
+            }, []);
+
+            useEffect(() => {
+                if (!appReady) return;
+                const t = setTimeout(() => {
+                    const key = getStorageKey(user);
+                    localStorage.setItem(key, JSON.stringify(items));
+                    if (saveStatus === '') { setSaveStatus('saved'); setTimeout(() => setSaveStatus(''), 2000); }
+                }, 1000);
+                return () => clearTimeout(t);
+            }, [items, user, appReady]);
+
+            useEffect(() => { if (!appReady) return; const key = getThemeKey(user); localStorage.setItem(key, JSON.stringify(theme)); }, [theme, user, appReady]);
+
+            const currentItem = useMemo(() => {
+                if (!items) return null;
+                return items.find(i => i.id === activeDeckId);
+            }, [items, activeDeckId]);
+
+            useEffect(() => {
+                setImageZoom(1);
+                setImagePos({ x: 0, y: 0 }); 
+            }, [activeDeckId]);
+
+            const currentCard = useMemo(() => {
+                if (currentItem && Array.isArray(currentItem.cards)) {
+                    return currentItem.cards[currentCardIndex];
+                }
+                return null;
+            }, [currentItem, currentCardIndex]);
+
+            // UPDATE: Sorting logic with filter support
+            const currentFolderItems = useMemo(() => {
+                if (!items) return [];
+
+                // --- Lógica de Filtro (RESTAURADA) ---
+                if (activeFilters.length > 0) {
+                    
+                    let targetItems = items;
+
+                    // Se estivermos dentro de uma pasta específica, precisamos filtrar recursivamente
+                    // para pegar apenas itens desta pasta e de suas subpastas
+                    if (currentFolderId !== null) {
+                        const getSubfolderIds = (rootId) => {
+                            const result = [rootId];
+                            const children = items.filter(i => i.parentId === rootId && i.type === 'folder');
+                            children.forEach(child => {
+                                result.push(...getSubfolderIds(child.id));
+                            });
+                            return result;
+                        };
+                        const allowedParentIds = getSubfolderIds(currentFolderId);
+                        targetItems = items.filter(i => allowedParentIds.includes(i.parentId));
+                    }
+
+                    // Aplica o filtro de tipo nos itens alvo (seja tudo ou sub-árvore)
+                    return targetItems
+                        .filter(i => activeFilters.includes(i.type))
+                        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+                }
+
+                // Normal Folder Mode
+                return items.filter(i => i.parentId === currentFolderId).sort((a,b) => {
+                    if (a.type === b.type) {
+                        return a.name.localeCompare(b.name, undefined, {sensitivity: 'base', numeric: true});
+                    }
+                    return a.type === 'folder' ? -1 : 1;
+                });
+            }, [items, currentFolderId, activeFilters]);
+
+            const breadcrumbs = useMemo(() => { const p=[]; let c=currentFolderId; while(c){const f=items.find(i=>i.id===c); if(f){p.unshift(f); c=f.parentId}else break;} return p; }, [items, currentFolderId]);
+            const withCloud = (newItems) => { setItems(newItems); saveToCloud(newItems, theme); };
+            const createFolder = () => { const name = prompt("Nome:"); if(!name) return; withCloud([...items, {id: Date.now().toString(), type:'folder', name, parentId: currentFolderId}]); setShowNewMenu(false); };
+            const createNote = () => { const name = prompt("Nome:"); if(!name) return; const note = {id: Date.now().toString()+Math.random(), type:'note', name, parentId: currentFolderId, content:''}; withCloud([...items, note]); setActiveDeckId(note.id); setShowNewMenu(false); };
+            const createVideo = () => { const name = prompt("Nome do Vídeo:"); if(!name) return; const url = prompt("Link do Vídeo (URL):"); if(!url) return; const video = {id: Date.now().toString()+Math.random(), type:'video', name, parentId: currentFolderId, content:url}; withCloud([...items, video]); setActiveDeckId(video.id); setShowNewMenu(false); };
+            const createImage = () => { 
+                const name = prompt("Nome da Imagem:"); 
+                if (!name) return; 
+                const url = prompt("Link da Imagem (URL):"); 
+                if (!url) return; 
+                const image = {
+                    id: Date.now().toString() + Math.random(), 
+                    type: 'image', 
+                    name, 
+                    parentId: currentFolderId, 
+                    content: url
+                }; 
+                withCloud([...items, image]); 
+                setActiveDeckId(image.id); 
+                setShowNewMenu(false); 
+            };
+
+            // --- NOVO: Função para alternar filtros (RESTAURADA) ---
+            const toggleFilter = (type) => {
+                setActiveFilters(prev => 
+                    prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+                );
+            };
+
+            const clearFilters = () => {
+                setActiveFilters([]);
+                setShowFilterMenu(false);
+            };
+
+            const handleFileUpload = async (e) => {
+                const files = Array.from(e.target.files); if(files.length===0) return;
+                const toAdd = [];
+                for(let f of files) {
+                    try {
+                        const id = Date.now().toString() + Math.random();
+                        if(f.name.endsWith('.pdf')) {
+                            await dbHelper.saveFile(id, f);
+                            toAdd.push({id, type:'pdf', name:f.name.replace('.pdf',''), parentId:currentFolderId});
+                        } else if(f.name.endsWith('.txt')) {
+                            const txt = await readFileAsText(f);
+                            toAdd.push({id, type:'note', name:f.name.replace('.txt',''), parentId:currentFolderId, content:txt});
+                        } else {
+                            const txt = await readFileAsText(f);
+                            const c = parseCSV(txt); if(c.length>0) toAdd.push({id, type:'deck', name:f.name.replace('.csv',''), parentId:currentFolderId, cards:c, progress:0, completions:0});
+                        }
+                    } catch(err){ console.error(err); }
+                }
+                if(toAdd.length>0) withCloud([...items, ...toAdd]);
+                e.target.value='';
+            };
+
+            const handlePdfRestore = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const uploadedName = file.name.replace('.pdf', '');
+                if (uploadedName !== currentItem.name) { alert(`Erro: O arquivo selecionado (${uploadedName}) não corresponde ao original (${currentItem.name}).`); e.target.value = ''; return; }
+                await dbHelper.saveFile(currentItem.id, file);
+                const url = URL.createObjectURL(file);
+                setPdfUrl(url);
+                setPdfMissing(false);
+                e.target.value = '';
+            };
+
+            useEffect(() => {
+                if (currentItem?.type === 'pdf') {
+                    setPdfMissing(false); 
+                    dbHelper.getFile(currentItem.id).then(blob => {
+                        if (blob) { const url = URL.createObjectURL(blob); setPdfUrl(url); } 
+                        else { setPdfUrl(null); setPdfMissing(true); }
+                    });
+                } else { if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); } setPdfMissing(false); }
+            }, [activeDeckId, currentItem]);
+
+            const updateDeckProgress = (id, idx) => setItems(p => p.map(i => i.id===id ? {...i, progress:idx} : i));
+            const updateNoteContent = (id, c) => setItems(p => p.map(i => i.id===id ? {...i, content:c} : i));
+            const handleFlip = () => setIsFlipped(!isFlipped);
+            const handleNext = () => { if(currentCardIndex < (currentItem.cards?.length || 0) -1){ const n=currentCardIndex+1; setIsFlipped(false); setTimeout(()=>{setCurrentCardIndex(n); updateDeckProgress(activeDeckId, n)},150); } else setShowCompletionModal(true); };
+            const handlePrev = () => { if(currentCardIndex > 0){ const n=currentCardIndex-1; setIsFlipped(false); setTimeout(()=>{setCurrentCardIndex(n); updateDeckProgress(activeDeckId, n)},150); } };
+            
+            // --- NOVO: Deletar item com remoção explícita na nuvem (Batch) ---
+            const deleteItem = async (e, id) => { 
+                e.stopPropagation(); 
+                if(confirm("Tem certeza?")) { 
+                    const getIds = (r, l) => { 
+                        let ids=[r]; 
+                        l.filter(i=>i.parentId===r).forEach(c=>ids.push(...getIds(c.id, l))); 
+                        return ids; 
+                    }; 
+                    const todel = getIds(id, items); 
+                    
+                    // 1. Deletar localmente do IndexedDB (PDFs)
+                    todel.forEach(tid => { 
+                        const it = items.find(x => x.id === tid); 
+                        if(it && it.type === 'pdf') dbHelper.deleteFile(tid); 
+                    }); 
+
+                    // 2. Deletar da Nuvem (Firestore Subcollection)
+                    if (user && !isGuest && window.firebaseAppObj) {
+                        try {
+                            const { db, doc, writeBatch } = window.firebaseAppObj;
+                            const appId = window.firebaseAppObj.config.projectId;
+                            
+                            // Processar deleções em lotes (limite 500)
+                            const chunkSize = 450;
+                            for (let i = 0; i < todel.length; i += chunkSize) {
+                                const chunk = todel.slice(i, i + chunkSize);
+                                const batch = writeBatch(db);
+                                
+                                chunk.forEach(tid => {
+                                    const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'backup', 'items', String(tid));
+                                    batch.delete(ref);
+                                });
+                                await batch.commit();
+                            }
+                            console.log(`Deletados da nuvem: ${todel.length} itens.`);
+                        } catch (err) {
+                            console.error("Erro ao deletar da nuvem:", err);
+                            showToast('error', 'Falha ao deletar da nuvem.');
+                        }
+                    }
+
+                    // 3. Atualizar Estado Local
+                    const next = items.filter(i => !todel.includes(i.id)); 
+                    withCloud(next); // Salva o restante (upsert)
+                    
+                    if(todel.includes(activeDeckId)) setActiveDeckId(null); 
+                } 
+            };
+
+            const saveRename = (e) => { e.stopPropagation(); if(tempName.trim()) withCloud(items.map(i => i.id===editingItemId ? {...i, name:tempName} : i)); setEditingItemId(null); };
+            const pasteItems = () => { if(!clipboard) return; const next = [...items]; const targets = items.filter(i=>clipboard.items.includes(i.id)); if(clipboard.mode==='cut') { targets.forEach(t=>{ const idx=next.findIndex(x=>x.id===t.id); if(idx!==-1) next[idx]={...next[idx], parentId:currentFolderId} }); setClipboard(null); } else { targets.forEach(t => { const n={...t, id:Date.now()+Math.random(), parentId:currentFolderId, name:t.name+' (Copiia)'}; if(t.type==='deck'){n.progress=0;n.completions=0;} next.push(n); }); } withCloud(next); };
+            const startRenaming = (e, item) => { e.stopPropagation(); setEditingItemId(item.id); setTempName(item.name); setTimeout(() => editInputRef.current?.focus(), 50); };
+            const addToClipboard = (e, item, mode) => { e.stopPropagation(); setClipboard({ mode, items: [item.id] }); };
+            const cancelClipboard = () => setClipboard(null);
+            
+            useEffect(() => { const h = (e) => { if(!activeDeckId || showSettings || showStats || showCompletionModal || editingItemId) return; if(currentItem?.type==='note' || currentItem?.type==='pdf') return; if(e.code==='Space'){e.preventDefault(); handleFlip()} else if(e.code==='ArrowRight') handleNext(); else if(e.code==='ArrowLeft') handlePrev(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [activeDeckId, currentCardIndex, isFlipped, showSettings, showStats, showCompletionModal, editingItemId, currentItem]);
+
+            const selectDeck = (id) => { if (editingItemId) return; setActiveDeckId(id); setIsFlipped(false); };
+            const finishDeckTransition = (completed) => {
+                setShowCompletionModal(false);
+                const compl = completed ? (currentItem.completions||0)+1 : (currentItem.completions||0);
+                const nextItems = items.map(i => i.id===activeDeckId ? {...i, progress:0, completions: compl} : i);
+                if(completed) saveToCloud(nextItems, theme);
+                setItems(nextItems);
+                setIsFlipped(false);
+                setTimeout(() => {
+                    const sibs = items.filter(i => i.parentId === currentItem.parentId && i.type === 'deck').sort((a,b)=>a.name.localeCompare(b.name));
+                    const idx = sibs.findIndex(i=>i.id===activeDeckId);
+                    if(idx!==-1 && idx < sibs.length-1) setActiveDeckId(sibs[idx+1].id);
+                    else if(sibs.length>0) { setActiveDeckId(sibs[0].id); setCurrentCardIndex(0); }
+                }, 150);
+            };
+
+            const StatsModal = () => {
+                const [memory, setMemory] = useState(null);
+                const [storage, setStorage] = useState({ local: '0', cloud: '0' });
+                const [counts, setCounts] = useState({ deck: 0, note: 0, pdf: 0, video: 0, image: 0, folder: 0 });
+
+                useEffect(() => {
+                    setCounts({
+                        deck: items.filter(i => i.type === 'deck').length,
+                        note: items.filter(i => i.type === 'note').length,
+                        pdf: items.filter(i => i.type === 'pdf').length,
+                        video: items.filter(i => i.type === 'video').length,
+                        image: items.filter(i => i.type === 'image').length,
+                        folder: items.filter(i => i.type === 'folder').length,
+                    });
+
+                    let localSize = 0;
+                    try {
+                        for (let key in localStorage) {
+                            if (localStorage.hasOwnProperty(key)) {
+                                localSize += localStorage[key].length * 2; 
+                            }
+                        }
+                    } catch(e) {}
+                    
+                    const cloudContent = JSON.stringify({ items, theme });
+                    const cloudSize = cloudContent.length * 2;
+
+                    setStorage({
+                        local: (localSize / 1024).toFixed(2) + ' KB', 
+                        cloud: (cloudSize / 1024).toFixed(2) + ' KB'
+                    });
+
+                    if (window.performance && window.performance.memory) {
+                        setMemory({
+                            used: (window.performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1) + ' MB',
+                            limit: (window.performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(1) + ' MB'
+                        });
+                    }
+
+                    const interval = setInterval(() => {
+                         if (window.performance && window.performance.memory) {
+                            setMemory({
+                                used: (window.performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1) + ' MB',
+                                limit: (window.performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(1) + ' MB'
+                            });
+                        }
+                    }, 2000);
+                    return () => clearInterval(interval);
+
+                }, []);
+
+                return (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative flex flex-col max-h-[90vh]">
+                            <div className="flex justify-between items-center mb-6 border-b pb-2 shrink-0"><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Icon name="bar-chart" size={24} className="text-gray-500"/> Dados e Nuvem</h2><button onClick={() => setShowStats(false)} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={24} /></button></div>
+                            <div className="overflow-y-auto pr-2 custom-scroll flex-1">
+                                <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                    <div className="flex justify-between mb-2"><h3 className="font-bold gap-2 flex items-center"><Icon name="user" size={16}/> Conta</h3>{user && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Online</span>}</div>
+                                    <p className="text-sm text-gray-600 mb-3">{user ? user.email : "Convidado (Offline)"}</p>
+                                    {user ? (<div className="space-y-2"><button onClick={() => saveToCloud(items, theme)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center justify-center gap-2">Salvar na Nuvem</button>{lastCloudSave && <p className="text-xs text-center text-gray-400">Salvo: {lastCloudSave.toLocaleString()}</p>}<button onClick={() => window.firebaseAppObj.signOut(window.firebaseAppObj.auth)} className="w-full py-2 border rounded-lg text-sm">Sair</button></div>) : (<div className="space-y-2 text-center"><p className="text-xs text-gray-400">Faça login para salvar na nuvem.</p><button onClick={() => { setIsGuest(false); setUser(null); setShowStats(false); }} className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"><Icon name="logIn" size={16} /> Fazer Login / Criar Conta</button></div>)}
+                                </div>
+                                
+                                <div className="mb-6">
+                                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Estatísticas do Sistema</h3>
+                                    <div className="grid grid-cols-2 gap-3 mb-3">
+                                        <div className="bg-gray-100 p-3 rounded-lg">
+                                            <span className="text-xs text-gray-500 block">RAM (Uso/Total)</span>
+                                            <span className="font-mono text-sm font-bold text-gray-800">{memory ? `${memory.used} / ${memory.limit}` : 'N/A'}</span>
+                                        </div>
+                                        <div className="bg-gray-100 p-3 rounded-lg">
+                                            <span className="text-xs text-gray-500 block">Armazenamento Local</span>
+                                            <span className="font-mono text-sm font-bold text-gray-800">{storage.local}</span>
+                                        </div>
+                                        <div className="bg-gray-100 p-3 rounded-lg col-span-2">
+                                            <span className="text-xs text-gray-500 block">Estimativa Nuvem (JSON)</span>
+                                            <span className="font-mono text-sm font-bold text-gray-800">{storage.cloud}</span>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 text-center">
+                                        <div className="bg-blue-50 p-2 rounded-lg"><span className="block text-xl font-bold text-blue-700">{counts.deck}</span><span className="text-[10px] uppercase text-blue-400">Decks</span></div>
+                                        <div className="bg-indigo-50 p-2 rounded-lg"><span className="block text-xl font-bold text-indigo-700">{counts.note}</span><span className="text-[10px] uppercase text-indigo-400">Notas</span></div>
+                                        <div className="bg-red-50 p-2 rounded-lg"><span className="block text-xl font-bold text-red-700">{counts.pdf}</span><span className="text-[10px] uppercase text-red-400">PDFs</span></div>
+                                        <div className="bg-pink-50 p-2 rounded-lg"><span className="block text-xl font-bold text-pink-700">{counts.video}</span><span className="text-[10px] uppercase text-pink-400">Vídeos</span></div>
+                                        <div className="bg-purple-50 p-2 rounded-lg"><span className="block text-xl font-bold text-purple-700">{counts.image}</span><span className="text-[10px] uppercase text-purple-400">Imagens</span></div>
+                                        <div className="bg-yellow-50 p-2 rounded-lg"><span className="block text-xl font-bold text-yellow-700">{counts.folder}</span><span className="text-[10px] uppercase text-yellow-400">Pastas</span></div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t pt-4">
+                                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Backup Local (.json)</h3>
+                                    <button onClick={handleExportData} className="w-full py-2 mb-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2 transition-colors"><Icon name="download" size={16} /> Exportar</button>
+                                    <div className="relative">
+                                        <button onClick={() => importInputRef.current.click()} className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2 transition-colors"><Icon name="uploadCloud" size={16} /> Importar</button>
+                                        <input type="file" accept=".json" ref={importInputRef} onChange={handleImportData} className="hidden" />
+                                    </div>
+                                </div>
+                                <div className="border-t pt-4 mt-4"><button onClick={() => { if(confirm("Apagar tudo?")) { setItems([]); localStorage.clear(); setTheme(DEFAULT_THEME); setShowStats(false); } }} className="w-full py-3 bg-red-50 text-red-600 rounded-lg flex items-center justify-center gap-2"><Icon name="trash-2" size={20}/> Resetar App</button></div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const CompletionModal = () => (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
+                        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600"><Icon name="trophy" size={32} /></div>
+                        <h2 className="text-xl font-bold text-gray-800 mb-2">Fim do Baralho!</h2>
+                        <p className="text-gray-600 mb-6">Deseja contabilizar este baralho como completado?</p>
+                        <div className="flex gap-3"><button onClick={() => finishDeckTransition(false)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">Não</button><button onClick={() => finishDeckTransition(true)} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">Sim</button></div>
+                    </div>
+                </div>
+            );
+
+            const SettingsModal = () => (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
+                        <div className="flex justify-between items-center mb-6 border-b pb-2"><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Icon name="settings" size={24} className="text-gray-500"/> Cores e Tema</h2><button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={24} /></button></div>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Fundo (Frente)</label><input type="color" value={theme.frontBg} onChange={(e) => handleThemeChange('frontBg', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Texto (Frente)</label><input type="color" value={theme.frontText} onChange={(e) => handleThemeChange('frontText', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div></div>
+                            <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Fundo (Verso)</label><input type="color" value={theme.backBg} onChange={(e) => handleThemeChange('backBg', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Texto (Verso)</label><input type="color" value={theme.backText} onChange={(e) => handleThemeChange('backText', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div></div>
+                            <div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Cor do Progresso</label><input type="color" value={theme.progressColor} onChange={(e) => handleThemeChange('progressColor', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div>
+                        </div>
+                        <div className="mt-8 flex justify-between gap-3 border-t pt-4 items-center"><button onClick={resetTheme} className="text-xs text-gray-400 hover:text-gray-600 underline">Restaurar Padrão</button><button onClick={() => { setShowSettings(false); setSaveStatus('saved'); setTimeout(() => setSaveStatus(''), 2000); }} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"><Icon name="check" size={16} /> Salvar</button></div>
+                    </div>
+                </div>
+            );
+
+            // ... Main Render Return ...
+             return (
+                <ErrorBoundary>
+                    <div className="h-screen w-full flex flex-col md:flex-row bg-gray-50 overflow-hidden">
+                        {connectionLog && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg text-sm font-bold z-50 transition-all ${connectionLog.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{connectionLog.msg}</div>}
+                        
+                        {/* MAIN CONTENT */}
+                        <div className="flex-1 flex flex-col h-full relative order-2 md:order-1 overflow-hidden">
+                            <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center shadow-sm shrink-0"><span className="font-bold text-gray-700 truncate mr-2">{currentItem ? currentItem.name : "Selecione"}</span><button onClick={() => setShowQueue(!showQueue)} className="p-2 bg-gray-100 rounded"><Icon name="layers" size={20} /></button></div>
+                            <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
+                                {!currentItem ? (<div className="text-center text-gray-400 my-auto"><Icon name="arrow-up" size={48} className="mx-auto mb-4 opacity-20 rotate-90 md:rotate-0" /><p>Selecione um item.</p></div>) : currentItem.type === 'note' ? (
+                                    <div className="w-full max-w-4xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-blue-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Salvo auto</span></div><textarea className="flex-1 p-6 w-full resize-none focus:outline-none text-gray-700 font-mono text-sm leading-relaxed" value={currentItem.content || ''} onChange={(e) => updateNoteContent(currentItem.id, e.target.value)} placeholder="Digite..."></textarea></div>
+                                ) : currentItem.type === 'pdf' ? (
+                                    <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
+                                        <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-red-500" />{currentItem.name}</div><span className="text-xs text-gray-400">PDF Local</span></div>
+                                        {pdfUrl ? (<iframe src={`PDF%20LEITOR.html?id=${currentItem.id}`} className="w-full h-full border-none" title="PDF Viewer"></iframe>) : pdfMissing ? (<div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-500 space-y-4"><Icon name="fileText" size={48} className="text-gray-300" /><div><h3 className="font-bold text-gray-700">Arquivo não encontrado</h3><p className="text-xs mt-1">O PDF <b>{currentItem.name}.pdf</b> é local.</p></div><button onClick={() => restorePdfRef.current.click()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors">Localizar PDF</button><input ref={restorePdfRef} type="file" accept=".pdf" onChange={handlePdfRestore} className="hidden" /></div>) : (<div className="flex-1 flex items-center justify-center text-gray-400">Carregando...</div>)}
+                                    </div>
+                                ) : currentItem.type === 'video' ? (
+                                    <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
+                                        <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="video" size={18} className="text-pink-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Vídeo Link</span></div>
+                                        <div className="flex-1 bg-black relative">
+                                            <iframe src={getEmbedUrl(currentItem.content)} className="absolute inset-0 w-full h-full border-none" title={currentItem.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                        </div>
+                                    </div>
+                                ) : currentItem.type === 'image' ? (
+                                    <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
+                                        <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0">
+                                            <div className="flex items-center gap-2 font-semibold text-gray-700">
+                                                <Icon name="image" size={18} className="text-purple-500" />
+                                                {currentItem.name}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{getHostname(currentItem.content)}</span>
+                                                <span className="text-xs text-gray-400">Imagem Web</span>
+                                            </div>
+                                        </div>
+                                        <div 
+                                            className="flex-1 bg-gray-100 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
+                                            onMouseDown={handleImageMouseDown}
+                                            onMouseMove={handleImageMouseMove}
+                                            onMouseUp={handleImageMouseUp}
+                                            onMouseLeave={handleImageMouseUp}
+                                        >
+                                            <div className="absolute top-4 right-4 z-10 flex gap-2 bg-white/80 p-1 rounded-lg shadow backdrop-blur-sm">
+                                               <button onClick={() => setImageZoom(z => Math.max(0.1, z - 0.1))} className="p-1 hover:bg-gray-200 rounded"><Icon name="minus" size={16}/></button>
+                                               <span className="text-xs w-8 text-center self-center">{Math.round(imageZoom * 100)}%</span>
+                                               <button onClick={() => setImageZoom(z => z + 0.1)} className="p-1 hover:bg-gray-200 rounded"><Icon name="plus" size={16}/></button>
+                                               <button onClick={resetImage} className="p-1 hover:bg-gray-200 rounded text-red-500" title="Resetar"><Icon name="rotateCcw" size={16}/></button>
+                                            </div>
+                                            <div className="w-full h-full flex items-center justify-center pointer-events-none">
+                                                 <img 
+                                                    src={currentItem.content} 
+                                                    alt={currentItem.name} 
+                                                    style={{ 
+                                                        transform: `translate(${imagePos.x}px, ${imagePos.y}px) scale(${imageZoom})`, 
+                                                        transformOrigin: 'center', 
+                                                        transition: isDraggingImage ? 'none' : 'transform 0.2s ease-out',
+                                                        cursor: isDraggingImage ? 'grabbing' : 'grab'
+                                                    }}
+                                                    className="max-w-full max-h-full object-contain pointer-events-auto"
+                                                    draggable="false"
+                                                    onError={(e) => {e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x300?text=Erro+ao+carregar+imagem'}}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="w-full max-w-5xl flex-1 flex flex-col items-center my-auto"><div className="flex items-center justify-center w-full gap-4 md:gap-8"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronLeft" size={32} /></button><div className="perspective-1000 w-full max-w-2xl h-[350px] md:h-[500px] cursor-pointer group relative" onClick={handleFlip}><div className={`relative w-full h-full text-center transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}><div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden" style={{ backgroundColor: theme.frontBg, color: theme.frontText }}><div className="h-2 w-full" style={{ backgroundColor: `${theme.progressColor}33` }}><div className="h-full transition-all duration-300" style={{ width: `${(((currentCardIndex || 0) + 1) / (currentItem.cards?.length || 1)) * 100}%`, backgroundColor: theme.progressColor }}></div></div><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><div className="flex justify-between items-center w-full opacity-50"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded">Pergunta</span><span className="text-xs font-mono">{currentCardIndex + 1}/{currentItem.cards?.length || 0}</span></div><h2 className="text-2xl md:text-3xl font-semibold leading-snug">{currentCard ? currentCard.front : ""}</h2></div></div><div className="p-4 text-xs font-medium border-t border-black/5 opacity-50">Toque para virar</div></div><div className="absolute w-full h-full backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-700 overflow-hidden" style={{ backgroundColor: theme.backBg, color: theme.backText }}><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded self-center opacity-60">Resposta</span><p className="text-xl md:text-2xl font-light leading-relaxed whitespace-pre-wrap">{currentCard ? currentCard.back : ""}</p>{currentCard && (<button onClick={(e) => { e.stopPropagation(); const q = encodeURIComponent(`${currentCard.front} ${currentCard.back} explicar detalhadamente`).replace(/%20/g, '+'); window.open(`https://www.google.com/search?udm=50&aep=11&q=${q}`, '_blank'); }} className="mt-4 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-current opacity-60 hover:opacity-100 hover:bg-white/10 transition-all self-center"><Icon name="search" size={14} /> Saber mais</button>)}</div></div><div className="p-4 text-xs font-medium border-t border-white/10 opacity-50">Próximo...</div></div></div></div><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronRight" size={32} /></button></div><div className="flex md:hidden items-center justify-between w-full max-w-2xl mt-6 gap-4"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronLeft" size={24} /></button><button onClick={(e) => { e.stopPropagation(); handleFlip(); }} className="flex-1 py-4 text-white rounded-xl shadow font-semibold flex justify-center items-center gap-2" style={{ backgroundColor: theme.progressColor }}><Icon name="rotateCw" size={20} /> Virar</button><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronRight" size={24} /></button></div></div>
+                                )
+                            }
+                        </div>
+                    </div>
+
+                    {/* SIDEBAR */}
+                    {/* Alterado: Removido w-96 fixo no desktop, adicionado style dinâmico e o handler de resize */}
+                    <div 
+                        className={`fixed inset-0 z-40 bg-white flex flex-col transition-transform duration-300 md:relative md:translate-x-0 md:border-l border-gray-200 md:order-2 h-full ${showQueue ? 'translate-x-0' : 'translate-x-full'}`}
+                        style={isDesktop ? { width: sidebarWidth } : {}}
+                    >
+                        {/* --- NOVO: Handle de Redimensionamento (apenas desktop) --- */}
+                        <div 
+                            className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-400 z-50 transition-colors"
+                            onMouseDown={startResizing}
+                            style={{ backgroundColor: isResizing ? '#3b82f6' : 'transparent', touchAction: 'none' }}
+                        />
+
+                        <div className="p-4 bg-gray-50 border-b shrink-0 flex flex-col gap-3"><div className="flex justify-between items-center"><h2 className="font-bold text-gray-700 flex items-center gap-2"><Icon name="layers" size={20} /> Explorador</h2><div className="flex gap-1"><button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-200 rounded"><Icon name="settings" size={18}/></button><button onClick={() => setShowStats(true)} className={`p-2 hover:bg-gray-200 rounded ${saveStatus==='saved_cloud'?'text-green-500':''}`}><Icon name="barChart" size={18}/></button><button onClick={() => setShowQueue(false)} className="md:hidden p-2 hover:bg-gray-200 rounded"><Icon name="x" size={20}/></button></div></div><div className="flex items-center gap-1 text-sm overflow-x-auto whitespace-nowrap pb-1 custom-scroll">
+                            {/* --- HEADER ALTERNATIVO QUANDO FILTRANDO --- */}
+                            {activeFilters.length > 0 ? (
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="text-sm font-bold text-purple-600 flex items-center gap-1"><Icon name="filter" size={14}/> Filtro Ativo ({activeFilters.length})</span>
+                                    <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button>
+                                </div>
+                            ) : (
+                                <>
+                                    <button onClick={() => setCurrentFolderId(null)} className={`flex items-center hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${!currentFolderId ? 'font-bold text-blue-700' : 'text-gray-500'}`}><Icon name="home" size={14} className="mr-1"/> Início</button>
+                                    {breadcrumbs.map((folder, i) => (<React.Fragment key={folder.id}><span className="text-gray-300">/</span><button onClick={() => setCurrentFolderId(folder.id)} className={`hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${i === breadcrumbs.length - 1 ? 'font-bold text-blue-700' : 'text-gray-500'}`}>{folder.name}</button></React.Fragment>))}
+                                </>
+                            )}
+                        </div></div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-1">{!activeFilters.length && currentFolderId && (<button onClick={() => { const curr = items.find(i => i.id === currentFolderId); setCurrentFolderId(curr ? curr.parentId : null); }} className="w-full text-left p-2 hover:bg-gray-100 rounded text-gray-500 text-sm flex items-center gap-2 mb-2"><Icon name="cornerUpLeft" size={16} /> .. Voltar</button>)}{currentFolderItems.map(item => (<div key={item.id} className={`group relative p-2 rounded-lg border transition-all cursor-pointer select-none grid grid-cols-[auto_1fr_auto] gap-3 items-center ${item.id === activeDeckId ? 'bg-blue-50 border-blue-300 shadow-sm ring-1 ring-blue-200' : 'bg-white border-gray-100 hover:border-gray-300 hover:bg-gray-50'}`} onClick={() => { if (item.type === 'folder') setCurrentFolderId(item.id); else selectDeck(item.id); }}><div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.type === 'folder' ? 'bg-yellow-100 text-yellow-600' : item.type === 'note' ? 'bg-indigo-100 text-indigo-600' : item.type === 'pdf' ? 'bg-red-100 text-red-600' : item.type === 'video' ? 'bg-pink-100 text-pink-600' : item.type === 'image' ? 'bg-purple-100 text-purple-600' : (item.id === activeDeckId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500')}`}><Icon name={item.type === 'folder' ? 'folder' : item.type === 'note' ? 'fileText' : item.type === 'pdf' ? 'fileText' : item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : 'play'} size={14} className={item.id === activeDeckId ? "ml-0.5" : ""} /></div><div className="min-w-0">{editingItemId === item.id ? (<div className="flex items-center gap-1" onClick={e => e.stopPropagation()}><input ref={editInputRef} value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => { if(e.key==='Enter') saveRename(e); if(e.key==='Escape') setEditingItemId(null); }} className="w-full text-sm border rounded px-1 py-0.5 focus:border-blue-500 outline-none" /><button onClick={saveRename} className="text-green-600 p-1"><Icon name="check" size={14}/></button></div>) : (<div><p className={`text-sm font-medium truncate ${item.id === activeDeckId ? 'text-blue-900' : 'text-gray-700'}`}>{item.name}</p><div className="flex items-center gap-2 mt-0.5">{item.type === 'folder' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{countItemsInFolder(item.id)} itens</span> : item.type === 'note' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">Nota</span> : item.type === 'pdf' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">PDF Local</span> : item.type === 'video' ? <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 rounded-full">Vídeo</span> : item.type === 'image' ? <><span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 rounded-full">Imagem</span><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full max-w-[80px] truncate">{getHostname(item.content)}</span></> : <><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{Math.round(((item.progress || 0) / (item.cards?.length || 1)) * 100)}%</span>{item.completions > 0 && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 rounded-full flex items-center gap-1 font-bold"><Icon name="trophy" size={8} /> {item.completions}</span>}</>}</div></div>)}</div>{editingItemId !== item.id && (<div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><div className="flex items-center gap-1 mr-2"><button onClick={(e) => downloadItem(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Baixar"><Icon name="download" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'copy')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Copiar"><Icon name="copy" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'cut')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-orange-600 rounded" title="Recortar"><Icon name="scissors" size={14} /></button><button onClick={(e) => startRenaming(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-green-600 rounded" title="Renomear"><Icon name="edit2" size={14} /></button><button onClick={(e) => deleteItem(e, item.id)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-red-600 rounded" title="Excluir"><Icon name="trash2" size={14} /></button></div></div>)}</div>))}{currentFolderItems.length === 0 && (<div className="text-center text-gray-400 py-8 text-sm italic">{activeFilters.length > 0 ? "Nenhum arquivo encontrado." : "Pasta vazia"}</div>)}</div>
+                        <div className="p-4 bg-gray-50 border-t shrink-0 flex flex-col gap-2">{clipboard ? (<div className="flex gap-2 w-full"><button onClick={pasteItems} className="flex-1 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-medium flex items-center justify-center gap-2 border border-orange-200 animate-pulse"><Icon name="clipboard" size={16} /> Colar {clipboard.items.length} item(s) ({clipboard.mode === 'cut' ? 'Recortado' : 'Copiado'})</button><button onClick={cancelClipboard} className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded-lg"><Icon name="x" size={16} /></button></div>) : (<div className="flex gap-2"><div className="relative flex-1"><button onClick={() => setShowNewMenu(!showNewMenu)} className="w-full py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="plus" size={16} /> Novo</button>{showNewMenu && (<div className="absolute bottom-full left-0 w-full mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200"><button onClick={createFolder} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 border-b border-gray-50"><Icon name="folderPlus" size={16} className="text-yellow-500"/> Pasta</button><button onClick={createNote} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="fileText" size={16} className="text-indigo-500"/> Nota (Texto)</button><button onClick={createVideo} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="video" size={16} className="text-pink-500"/> Vídeo (Iframe)</button><button onClick={createImage} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="image" size={16} className="text-purple-500"/> Imagem (URL)</button></div>)}</div><button onClick={() => fileInputRef.current.click()} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="filePlus" size={16} /> Importar</button>
+                        <div className="relative">
+                            <button onClick={() => setShowFilterMenu(!showFilterMenu)} className={`h-full px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors ${activeFilters.length > 0 ? 'bg-purple-50 text-purple-600 border-purple-200 ring-1 ring-purple-200' : ''}`} title="Filtrar"><Icon name="filter" size={16} /></button>
+                            {showFilterMenu && (
+                                <div className="absolute bottom-full right-0 w-48 mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200 z-50">
+                                    <div className="p-3 border-b bg-gray-50 text-xs font-bold text-gray-500 uppercase">Filtrar por Tipo</div>
+                                    <div className="p-2 space-y-1">
+                                        {[
+                                            {id: 'deck', label: 'Flashcards', color: 'bg-blue-500'},
+                                            {id: 'note', label: 'Notas', color: 'bg-indigo-500'},
+                                            {id: 'pdf', label: 'PDF', color: 'bg-red-500'},
+                                            {id: 'video', label: 'Vídeo', color: 'bg-pink-500'},
+                                            {id: 'image', label: 'Imagem', color: 'bg-purple-500'}
+                                        ].map(type => (
+                                            <button 
+                                                key={type.id} 
+                                                onClick={() => toggleFilter(type.id)}
+                                                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${activeFilters.includes(type.id) ? 'bg-gray-100 font-medium text-gray-900' : 'hover:bg-gray-50 text-gray-600'}`}
+                                            >
+                                                <span className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${type.color}`}></span>{type.label}</span>
+                                                {activeFilters.includes(type.id) && <Icon name="check" size={14} className="text-green-600"/>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {activeFilters.length > 0 && <div className="p-2 border-t bg-gray-50"><button onClick={clearFilters} className="w-full py-1.5 text-xs text-red-600 hover:bg-red-50 rounded font-medium">Limpar Filtros</button></div>}
+                                </div>
+                            )}
+                        </div>
+                        </div>)}<input type="file" accept=".csv, .txt, .pdf" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" /></div>
+                    </div>
+                    {showSettings && <SettingsModal />}
+                    {showStats && <StatsModal />}
+                    {showCompletionModal && <CompletionModal />}
+                    {showQueue && <div className="fixed inset-0 bg-black/20 z-20 md:hidden backdrop-blur-sm" onClick={() => setShowQueue(false)}></div>}
+                </div>
+                </ErrorBoundary>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
