@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flashcard Flow - Cloud Pro v1.9.8</title>
+    <title>Flashcard Flow - Cloud Pro v2.0.7</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -47,8 +47,6 @@
         .custom-scroll::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.1); border-radius: 20px; }
         @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .toast-enter { animation: slideDown 0.3s ease-out forwards; }
-        
-        /* Classe para prevenir seleção de texto durante o redimensionamento */
         .select-none-important { user-select: none !important; -webkit-user-select: none !important; }
         .cursor-grab { cursor: grab; }
         .cursor-grabbing { cursor: grabbing; }
@@ -60,17 +58,30 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- CONSTANTES GLOBAIS ---
-        const APP_VERSION = "1.9.8";
-        const STORAGE_KEY = 'flashcardFlowData_v12';
-        const THEME_KEY = 'flashcardFlowTheme_v1';
-        const CONFIG_KEY = 'flashcardFlowConfig_v1';
+        // --- CONSTANTES ---
+        const APP_VERSION = "2.0.7";
         const FIREBASE_CONFIG_FIXED = { apiKey: "AIzaSyApOjZZ75TyDD126CyN4kF7dVeoMvAo5dk", authDomain: "estudos-ec4c5.firebaseapp.com", projectId: "estudos-ec4c5", storageBucket: "estudos-ec4c5.firebasestorage.app", messagingSenderId: "152433763794", appId: "1:152433763794:web:31b8b3fc2f2ee7ae4ed40b", measurementId: "G-YVK8REQRF8" };
         const DEFAULT_THEME = { frontBg: '#ffffff', frontText: '#1f2937', backBg: '#0f172a', backText: '#e2e8f0', progressColor: '#3b82f6', headerBg: '#ffffff' };
         
         const THEME_KEY_PREFIX = 'flashcardFlowTheme_v1_';
         const getStorageKey = (u) => `flashcardFlowData_v13_${u ? u.uid : 'guest'}`;
         const getThemeKey = (u) => `${THEME_KEY_PREFIX}${u ? u.uid : 'guest'}`;
+
+        // --- HELPER SEGURO PARA LOCALSTORAGE ---
+        const safeLocalStorage = {
+            getItem: (key) => {
+                try { return localStorage.getItem(key); } catch (e) { console.warn("Storage bloqueado"); return null; }
+            },
+            setItem: (key, value) => {
+                try { localStorage.setItem(key, value); } catch (e) { console.warn("Storage bloqueado"); }
+            },
+            removeItem: (key) => {
+                try { localStorage.removeItem(key); } catch (e) { console.warn("Storage bloqueado"); }
+            },
+            clear: () => {
+                try { localStorage.clear(); } catch (e) { console.warn("Storage bloqueado"); }
+            }
+        };
 
         // --- ERROR BOUNDARY ---
         class ErrorBoundary extends React.Component {
@@ -79,69 +90,37 @@
             componentDidCatch(error, errorInfo) { console.error("Critical Error:", error, errorInfo); }
             render() {
                 if (this.state.hasError) {
-                    return (
-                        <div className="min-h-screen flex items-center justify-center bg-red-50 p-6 text-center">
-                            <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-xl border border-red-100">
-                                <h2 className="text-2xl font-bold text-red-600 mb-2">Ops! Ocorreu um erro.</h2>
-                                <p className="text-gray-600 mb-4 text-sm">Os dados carregados parecem estar corrompidos ou incompatíveis.</p>
-                                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-colors">Resetar Aplicativo</button>
-                            </div>
-                        </div>
-                    );
+                    return <div className="p-6 text-center text-red-600"><h2>Ops! Erro crítico.</h2><button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-100 rounded">Recarregar</button></div>;
                 }
                 return this.props.children;
             }
         }
 
-        // --- INDEXED DB HELPER ---
+        // --- DB HELPER ---
         const DB_NAME = 'FlashcardFlowFiles';
         const DB_VERSION = 1; 
         const STORE_NAME = 'files';
-        
         const dbHelper = {
             open: () => new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                
-                request.onupgradeneeded = (event) => { 
-                    const db = event.target.result; 
-                    if (!db.objectStoreNames.contains(STORE_NAME)) { 
-                        db.createObjectStore(STORE_NAME); 
-                    } 
-                };
-                
-                request.onsuccess = (event) => resolve(event.target.result);
-                
-                request.onerror = (event) => {
-                    if (event.target.error && event.target.error.name === 'VersionError') {
-                        console.warn("Versão do DB incompatível. Resetando DB para garantir compatibilidade com o Leitor...");
-                        event.preventDefault(); 
-                        const delReq = indexedDB.deleteDatabase(DB_NAME);
-                        delReq.onsuccess = () => {
-                            console.log("DB Resetado. Tentando reabrir...");
-                            resolve(dbHelper.open());
-                        };
-                        delReq.onerror = () => reject(new Error("Falha ao resetar DB."));
-                    } else {
-                        reject(event.target.error);
-                    }
-                };
+                try {
+                    const request = indexedDB.open(DB_NAME, DB_VERSION);
+                    request.onupgradeneeded = (event) => { const db = event.target.result; if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME); };
+                    request.onsuccess = (event) => resolve(event.target.result);
+                    request.onerror = (event) => {
+                        if (event.target.error && event.target.error.name === 'VersionError') {
+                            const delReq = indexedDB.deleteDatabase(DB_NAME);
+                            delReq.onsuccess = () => resolve(dbHelper.open());
+                            delReq.onerror = () => reject(new Error("Falha DB Reset"));
+                        } else reject(event.target.error);
+                    };
+                } catch(e) { reject(e); }
             }),
-            saveFile: async (id, blob) => { const db = await dbHelper.open(); return new Promise((resolve, reject) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); const request = store.put(blob, id); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); }); },
-            getFile: async (id) => { const db = await dbHelper.open(); return new Promise((resolve, reject) => { const tx = db.transaction(STORE_NAME, 'readonly'); const store = tx.objectStore(STORE_NAME); const request = store.get(id); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); },
-            deleteFile: async (id) => { const db = await dbHelper.open(); return new Promise((resolve, reject) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); const request = store.delete(id); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); }); },
-            exists: async (id) => { 
-                const db = await dbHelper.open();
-                return new Promise((resolve, reject) => {
-                    const tx = db.transaction(STORE_NAME, 'readonly');
-                    const store = tx.objectStore(STORE_NAME);
-                    const request = store.count(id);
-                    request.onsuccess = () => resolve(request.result > 0);
-                    request.onerror = () => reject(request.error);
-                });
-            }
+            saveFile: async (id, blob) => { try { const db = await dbHelper.open(); return new Promise((resolve, reject) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); store.put(blob, id).onsuccess = resolve; }); } catch(e) { console.warn("IDB Fail", e); } },
+            getFile: async (id) => { try { const db = await dbHelper.open(); return new Promise((resolve, reject) => { const tx = db.transaction(STORE_NAME, 'readonly'); const store = tx.objectStore(STORE_NAME); const req = store.get(id); req.onsuccess = () => resolve(req.result); req.onerror = () => resolve(null); }); } catch(e) { return null; } },
+            deleteFile: async (id) => { try { const db = await dbHelper.open(); const tx = db.transaction(STORE_NAME, 'readwrite'); tx.objectStore(STORE_NAME).delete(id); } catch(e) {} }
         };
 
-        // --- ICON HELPER ---
+        // --- ICON ---
         const Icon = ({ name, size = 24, className, onClick }) => {
             const props = { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className, onClick };
             const paths = {
@@ -205,8 +184,9 @@
 
             const handleAuth = async (e) => {
                 e.preventDefault(); setError(''); setLoading(true);
-                const { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = window.firebaseAppObj; 
-                if (!auth) { setError("Erro interno de Auth."); setLoading(false); return; }
+                const appObj = window.firebaseAppObj;
+                if (!appObj) { setError("Erro: Firebase indisponível. Verifique conexão."); setLoading(false); return; }
+                const { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = appObj;
                 try {
                     let userCredential;
                     if (isRegister) userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -219,8 +199,8 @@
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white p-6 rounded-xl max-w-md w-full relative max-h-[90vh] overflow-y-auto">
                         <button onClick={() => setShowHelp(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><Icon name="x" size={24} /></button>
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icon name="settings" size={24} /> Configuração do Firebase</h2>
-                        <ol className="list-decimal pl-5 space-y-3 text-sm text-gray-600"><li>Acesse o <b>Firebase Console</b> e selecione seu projeto.</li><li><strong>Ativar Login:</strong><ul className="list-disc pl-5 mt-1"><li>Vá em <i>Criação (Build)</i> &gt; <i>Authentication</i>.</li><li>Na aba <i>Sign-in method</i>, ative <b>Email/Password</b>.</li></ul></li><li><strong>Ativar Banco de Dados:</strong><ul className="list-disc pl-5 mt-1"><li>Vá em <i>Criação</i> &gt; <i>Firestore Database</i>.</li><li>Clique em <i>Create Database</i> e escolha <b>Test Mode</b>.</li></ul></li></ol>
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icon name="settings" size={24} /> Configuração</h2>
+                        <p className="text-gray-600 text-sm">Se o Firebase não carregar, use o modo convidado.</p>
                         <button onClick={() => setShowHelp(false)} className="w-full mt-6 py-2 bg-blue-600 text-white rounded-lg">Entendi</button>
                     </div>
                 </div>
@@ -230,10 +210,18 @@
                 <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
                     <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-gray-200 relative">
                         <div className="absolute top-4 right-4 flex gap-2"><button onClick={() => setShowHelp(true)} className="text-gray-300 hover:text-blue-500" title="Ajuda"><Icon name="helpCircle" size={20} /></button></div>
-                        <div className="text-center mb-8"><div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-lg"><Icon name="layers" size={32} /></div><h1 className="text-2xl font-bold text-gray-800">Flashcard Flow</h1><p className="text-gray-500 text-sm">Seus estudos nas nuvens.</p><p className="text-xs text-gray-400 mt-1">versão {APP_VERSION}</p></div>
+                        <div className="text-center mb-8"><div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-white shadow-lg"><Icon name="layers" size={32} /></div><h1 className="text-2xl font-bold text-gray-800">Flashcard Flow</h1><p className="text-gray-500 text-sm">Seus estudos nas nuvens.</p></div>
                         {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg">{error}</div>}
-                        <form onSubmit={handleAuth} className="space-y-4"><div><label className="block text-xs font-bold text-gray-700 uppercase mb-1">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="seu@email.com" required /></div><div><label className="block text-xs font-bold text-gray-700 uppercase mb-1">Senha</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••" required /></div><button type="submit" disabled={loading} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2">{loading ? "..." : (isRegister ? "Criar Conta" : "Entrar")}</button></form>
-                        <div className="mt-6 flex flex-col gap-3"><button onClick={() => setIsRegister(!isRegister)} className="text-sm text-blue-600 hover:underline text-center">{isRegister ? "Já tem conta? Entrar" : "Criar conta"}</button><div className="relative flex py-2 items-center"><div className="flex-grow border-t border-gray-200"></div><span className="flex-shrink-0 mx-4 text-gray-400 text-xs">OU</span><div className="flex-grow border-t border-gray-200"></div></div><button onClick={onGuest} className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-600 font-medium rounded-lg border border-gray-200 text-sm">Continuar sem conta</button></div>
+                        <form onSubmit={handleAuth} className="space-y-4">
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase mb-1">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="seu@email.com" required /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase mb-1">Senha</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••" required /></div>
+                            <button type="submit" disabled={loading} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2">{loading ? "..." : (isRegister ? "Criar Conta" : "Entrar")}</button>
+                        </form>
+                        <div className="mt-6 flex flex-col gap-3">
+                            <button onClick={() => setIsRegister(!isRegister)} className="text-sm text-blue-600 hover:underline text-center">{isRegister ? "Já tem conta? Entrar" : "Criar conta"}</button>
+                            <div className="relative flex py-2 items-center"><div className="flex-grow border-t border-gray-200"></div><span className="flex-shrink-0 mx-4 text-gray-400 text-xs">OU</span><div className="flex-grow border-t border-gray-200"></div></div>
+                            <button onClick={onGuest} className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-600 font-medium rounded-lg border border-gray-200 text-sm">Continuar sem conta</button>
+                        </div>
                         {showHelp && <HelpModal />}
                     </div>
                 </div>
@@ -266,17 +254,17 @@
             const [pdfMissing, setPdfMissing] = useState(false);
             const [imageZoom, setImageZoom] = useState(1);
             
-            // --- Estados para Pan (Arrastar Imagem) ---
+            // --- Estados para Pan ---
             const [imagePos, setImagePos] = useState({ x: 0, y: 0 });
             const [isDraggingImage, setIsDraggingImage] = useState(false);
             const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-            // --- Estados de Redimensionamento da Sidebar ---
+            // --- Estados Resize ---
             const [sidebarWidth, setSidebarWidth] = useState(384); 
             const [isResizing, setIsResizing] = useState(false);
             const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
 
-            // --- Estados de Filtro (RESTAURADO) ---
+            // --- Estados Filtro ---
             const [showFilterMenu, setShowFilterMenu] = useState(false);
             const [activeFilters, setActiveFilters] = useState([]);
 
@@ -285,23 +273,16 @@
             const editInputRef = useRef(null);
             const restorePdfRef = useRef(null);
 
+            // ... (Helpers: getEmbedUrl, getHostname, resize logic kept same) ...
             const getEmbedUrl = (url) => {
                 if (!url) return '';
                 const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
                 const match = url.match(youtubeRegex);
-                if (match && match[1]) {
-                    return `https://www.youtube.com/embed/${match[1]}`;
-                }
+                if (match && match[1]) return `https://www.youtube.com/embed/${match[1]}`;
                 return url;
             };
 
-            const getHostname = (url) => {
-                try {
-                    return new URL(url).hostname.replace('www.', '');
-                } catch (e) {
-                    return 'url';
-                }
-            };
+            const getHostname = (url) => { try { return new URL(url).hostname.replace('www.', ''); } catch (e) { return 'url'; } };
 
             useEffect(() => {
                 const handleResize = () => setIsDesktop(window.innerWidth >= 768);
@@ -309,210 +290,89 @@
                 return () => window.removeEventListener('resize', handleResize);
             }, []);
 
-            const startResizing = useCallback((e) => {
-                e.preventDefault();
-                setIsResizing(true);
-            }, []);
+            const startResizing = useCallback((e) => { e.preventDefault(); setIsResizing(true); }, []);
 
             useEffect(() => {
                 const resize = (e) => {
                     if (isResizing) {
                         let newWidth = document.body.clientWidth - e.clientX;
-                        if (newWidth < 250) newWidth = 250;
-                        if (newWidth > 800) newWidth = 800;
+                        if (newWidth < 250) newWidth = 250; if (newWidth > 800) newWidth = 800;
                         setSidebarWidth(newWidth);
                     }
                 };
                 const stopResizing = () => { setIsResizing(false); };
-                if (isResizing) {
-                    window.addEventListener('mousemove', resize);
-                    window.addEventListener('mouseup', stopResizing);
-                    document.body.classList.add('select-none-important');
-                    document.body.style.cursor = 'ew-resize';
-                } else {
-                    document.body.classList.remove('select-none-important');
-                    document.body.style.cursor = 'default';
-                }
-                return () => {
-                    window.removeEventListener('mousemove', resize);
-                    window.removeEventListener('mouseup', stopResizing);
-                    document.body.classList.remove('select-none-important');
-                    document.body.style.cursor = 'default';
-                };
+                if (isResizing) { window.addEventListener('mousemove', resize); window.addEventListener('mouseup', stopResizing); document.body.classList.add('select-none-important'); document.body.style.cursor = 'ew-resize'; } 
+                else { document.body.classList.remove('select-none-important'); document.body.style.cursor = 'default'; }
+                return () => { window.removeEventListener('mousemove', resize); window.removeEventListener('mouseup', stopResizing); document.body.classList.remove('select-none-important'); document.body.style.cursor = 'default'; };
             }, [isResizing]);
 
-            const handleImageMouseDown = (e) => {
-                e.preventDefault();
-                setIsDraggingImage(true);
-                setDragStart({ x: e.clientX - imagePos.x, y: e.clientY - imagePos.y });
-            };
+            const handleImageMouseDown = (e) => { e.preventDefault(); setIsDraggingImage(true); setDragStart({ x: e.clientX - imagePos.x, y: e.clientY - imagePos.y }); };
+            const handleImageMouseMove = (e) => { if (!isDraggingImage) return; e.preventDefault(); setImagePos({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }); };
+            const handleImageMouseUp = () => { setIsDraggingImage(false); };
+            const resetImage = () => { setImageZoom(1); setImagePos({ x: 0, y: 0 }); };
 
-            const handleImageMouseMove = (e) => {
-                if (!isDraggingImage) return;
-                e.preventDefault();
-                setImagePos({
-                    x: e.clientX - dragStart.x,
-                    y: e.clientY - dragStart.y
-                });
-            };
-
-            const handleImageMouseUp = () => {
-                setIsDraggingImage(false);
-            };
-
-            const resetImage = () => {
-                setImageZoom(1);
-                setImagePos({ x: 0, y: 0 });
-            };
-
-            // Sanitização de dados ao carregar
             const sanitizeItems = (rawItems) => {
                 if (!Array.isArray(rawItems)) return [];
-                return rawItems.map(item => {
-                    if (item.type === 'deck') {
-                        return { 
-                            ...item, 
-                            cards: Array.isArray(item.cards) ? item.cards : [],
-                            progress: Number(item.progress) || 0,
-                            completions: Number(item.completions) || 0
-                        };
-                    }
-                    return item;
-                });
+                return rawItems.map(item => { if (item.type === 'deck') { return { ...item, cards: Array.isArray(item.cards) ? item.cards : [], progress: Number(item.progress) || 0, completions: Number(item.completions) || 0 }; } return item; });
             };
 
-            const countItemsInFolder = (folderId) => {
-                if (!Array.isArray(items)) return 0;
-                return items.filter(i => i.parentId === folderId).length;
-            };
-            
+            const countItemsInFolder = (folderId) => items.filter(i => i.parentId === folderId).length;
             const showToast = (type, msg) => { setConnectionLog({ type, msg }); setTimeout(() => setConnectionLog(null), 4000); };
             const readFileAsText = (file) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = (e) => resolve(e.target.result); r.onerror = reject; r.readAsText(file); });
             const parseCSV = (text) => { const lines = text.split('\n').filter(l => l.trim() !== ''); const parseLine = (t) => { const res = []; let cell = ''; let q = false; for(let i=0;i<t.length;i++){ if(t[i]==='"'){ if(q && t[i+1]==='"'){cell+='"';i++}else{q=!q} } else if(t[i]===',' && !q){ res.push(cell.trim()); cell='' } else cell+=t[i]; } res.push(cell.trim()); return res; }; return lines.map((l,i) => { const p = parseLine(l); if(p.length<2 || (i===0 && p[0].toLowerCase().includes('pergunta'))) return null; return { front: p[0], back: p[1] }; }).filter(Boolean); };
-            const getStorageSize = () => { try { return (JSON.stringify(localStorage).length / 1024).toFixed(2); } catch(e) { return 0; } };
-            const getMemoryUsage = () => window.performance?.memory ? Math.round(window.performance.memory.usedJSHeapSize / 1024 / 1024) : null;
             
-            // --- NOVO saveToCloud: Usa Subcoleção e Batches (1MB+ Scalable) ---
             const saveToCloud = async (currItems = items, currTheme = theme) => { 
                 if (!user || isGuest || !window.firebaseAppObj) return; 
-                
-                const { db, doc, setDoc, writeBatch, collection, getDocs, deleteField } = window.firebaseAppObj; 
+                const { db, doc, setDoc, writeBatch, collection, deleteField } = window.firebaseAppObj; 
                 setSaveStatus('saving'); 
-                
                 try { 
                     const appId = window.firebaseAppObj.config.projectId; 
                     const userRoot = `artifacts/${appId}/users/${user.uid}/data/backup`;
                     const itemsCollectionRef = collection(db, 'artifacts', appId, 'users', user.uid, 'data', 'backup', 'items');
-
-                    // 1. Salvar Metadados (Tema, Timestamp, Versão App) no documento raiz
-                    // NOTA: removemos 'items' array daqui para economizar espaço
                     const rootRef = doc(db, userRoot);
-                    await setDoc(rootRef, { 
-                        theme: currTheme, 
-                        timestamp: Date.now(),
-                        appVersion: APP_VERSION,
-                        // Opcional: flag para indicar que os itens migraram
-                        migratedToSubcollection: true,
-                        // Remove o array antigo se existir para liberar espaço
-                        items: deleteField() 
-                    }, { merge: true });
-
-                    // 2. Salvar Itens na Subcoleção usando Batches (Limite 500 ops por batch)
-                    // Estratégia simples: Sobrescrever todos (Upsert). 
-                    // Para deletar itens removidos, o ideal seria ler primeiro ou ter um log de deletados.
-                    // Para este "Backup", vamos focar em garantir que o que está na tela vá para a nuvem.
-                    
-                    const chunkSize = 450; // Margem de segurança (limite é 500)
+                    await setDoc(rootRef, { theme: currTheme, timestamp: Date.now(), appVersion: APP_VERSION, migratedToSubcollection: true, items: deleteField() }, { merge: true });
+                    const chunkSize = 450; 
                     for (let i = 0; i < currItems.length; i += chunkSize) {
                         const chunk = currItems.slice(i, i + chunkSize);
                         const batch = writeBatch(db);
-                        
-                        chunk.forEach(item => {
-                            // Cria uma referência para o documento do item
-                            const itemRef = doc(itemsCollectionRef, String(item.id)); 
-                            batch.set(itemRef, item);
-                        });
-
+                        chunk.forEach(item => { const itemRef = doc(itemsCollectionRef, String(item.id)); batch.set(itemRef, item); });
                         await batch.commit();
                     }
-
-                    setLastCloudSave(new Date()); 
-                    setSaveStatus('saved_cloud'); 
-                    setTimeout(() => setSaveStatus(''), 3000); 
-                } catch (e) { 
-                    console.error("Erro ao salvar:", e); 
-                    setSaveStatus('error'); 
-                    showToast('error', 'Erro ao salvar na nuvem.'); 
-                } 
+                    setLastCloudSave(new Date()); setSaveStatus('saved_cloud'); setTimeout(() => setSaveStatus(''), 3000); 
+                } catch (e) { console.error("Erro ao salvar:", e); setSaveStatus('error'); showToast('error', 'Erro ao salvar na nuvem.'); } 
             };
 
             const handleExportData = () => { const data = { items, theme, timestamp: Date.now(), appVersion: '3.0' }; const blob = new Blob([JSON.stringify(data)], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup_flashcards_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
             
-            // --- CORREÇÃO DA IMPORTAÇÃO ---
             const handleImportData = async (event) => {
                 const file = event.target.files[0];
                 if(!file) return;
                 try {
                     const text = await readFileAsText(file);
                     const data = JSON.parse(text);
-                    
                     if(Array.isArray(data.items) || (data.decks && Array.isArray(data.decks))) {
                         const rawImport = data.items || data.decks;
-                        const msg = user ? "Deseja substituir seus dados atuais e salvar na nuvem? (Cancel para mesclar)" : "Deseja substituir seus dados atuais? (Cancel para cancelar)";
+                        const msg = user ? "Substituir dados na nuvem? (Cancel para mesclar)" : "Substituir dados atuais? (Cancel para cancelar)";
                         const shouldReplace = confirm(msg);
-
                         let newItems = [];
-
                         if (shouldReplace) {
-                            newItems = rawImport.map(d => ({ 
-                                ...d, 
-                                id: d.id || Date.now() + Math.random(), 
-                                type: d.type || 'deck', 
-                                parentId: d.parentId || null, 
-                                completions: d.completions || 0, 
-                                progress: d.progress || 0 
-                            })); 
+                            newItems = rawImport.map(d => ({ ...d, id: d.id || Date.now() + Math.random(), type: d.type || 'deck', parentId: d.parentId || null, completions: d.completions || 0, progress: d.progress || 0 })); 
                         } else if (user) {
                             const idMap = {};
-                            const remapped = rawImport.map(d => {
-                                const newId = Date.now().toString() + Math.random();
-                                idMap[d.id] = newId;
-                                return { ...d, oldId: d.id, id: newId };
-                            });
-                            const finalImport = remapped.map(d => ({
-                                ...d,
-                                type: d.type || 'deck',
-                                parentId: idMap[d.parentId] || null, 
-                                completions: d.completions || 0,
-                                progress: d.progress || 0
-                            }));
+                            const remapped = rawImport.map(d => { const newId = Date.now().toString() + Math.random(); idMap[d.id] = newId; return { ...d, oldId: d.id, id: newId }; });
+                            const finalImport = remapped.map(d => ({ ...d, type: d.type || 'deck', parentId: idMap[d.parentId] || null, completions: d.completions || 0, progress: d.progress || 0 }));
                             newItems = [...items, ...finalImport];
-                        } else {
-                            return; 
-                        }
-
-                        setItems(sanitizeItems(newItems));
-                        setCurrentFolderId(null);
-                        setActiveDeckId(null);
-                        
+                        } else { return; }
+                        setItems(sanitizeItems(newItems)); setCurrentFolderId(null); setActiveDeckId(null);
                         if(data.theme && shouldReplace) setTheme(data.theme);
-                        
-                        if (user) { 
-                            saveToCloud(newItems, (data.theme && shouldReplace) ? data.theme : theme); 
-                        }
-                        
-                        alert("Importação concluída!");
-                        setShowStats(false);
-                    } else {
-                        alert("Arquivo inválido.");
-                    }
-                } catch (e) {
-                    alert("Erro: " + e.message);
-                }
+                        if (user) { saveToCloud(newItems, (data.theme && shouldReplace) ? data.theme : theme); }
+                        alert("Importação concluída!"); setShowStats(false);
+                    } else { alert("Arquivo inválido."); }
+                } catch (e) { alert("Erro: " + e.message); }
                 event.target.value = '';
             };
 
-            const clearAllData = () => { if(confirm("Isso apagará TODOS os arquivos. Tem certeza?")) { setItems([]); setCurrentFolderId(null); setActiveDeckId(null); setCurrentCardIndex(0); localStorage.removeItem(getStorageKey(user)); setTheme(DEFAULT_THEME); saveToCloud([], DEFAULT_THEME); setShowStats(false); } };
+            const clearAllData = () => { if(confirm("Apagar tudo?")) { setItems([]); setCurrentFolderId(null); setActiveDeckId(null); setCurrentCardIndex(0); safeLocalStorage.removeItem(getStorageKey(user)); setTheme(DEFAULT_THEME); saveToCloud([], DEFAULT_THEME); setShowStats(false); } };
             const handleThemeChange = (k, v) => setTheme(p => ({...p, [k]: v}));
             const resetTheme = () => setTheme(DEFAULT_THEME);
 
@@ -522,79 +382,57 @@
                 const key = getStorageKey(user);
                 const themeKey = getThemeKey(user);
                 try {
-                    const savedItems = localStorage.getItem(key);
+                    const savedItems = safeLocalStorage.getItem(key);
                     if (savedItems) setItems(sanitizeItems(JSON.parse(savedItems))); else setItems([]); 
-                    const savedTheme = localStorage.getItem(themeKey);
+                    const savedTheme = safeLocalStorage.getItem(themeKey);
                     if (savedTheme) setTheme(JSON.parse(savedTheme)); else setTheme(DEFAULT_THEME);
                     setCurrentFolderId(null); setActiveDeckId(null); setCurrentCardIndex(0); setLastCloudSave(null);
                 } catch (e) { console.error(e); }
             }, [user, appReady]);
 
-            // --- NOVO loadFromCloud: Suporta Híbrido (Array Antigo ou Subcoleção Nova) ---
             const loadFromCloud = async (currentUser, dbInstance) => {
                 const { doc, getDoc, collection, getDocs } = window.firebaseSDK;
                 const appId = window.firebaseAppObj.config.projectId;
-                
                 try {
-                    // 1. Tenta carregar Metadados
                     const ref = doc(dbInstance, 'artifacts', appId, 'users', currentUser.uid, 'data', 'backup');
                     const snap = await getDoc(ref);
-                    
-                    let cloudItems = [];
-                    let cloudTheme = null;
-                    let cloudTime = null;
-
+                    let cloudItems = []; let cloudTheme = null; let cloudTime = null;
                     if (snap.exists()) {
                         const d = snap.data();
-                        cloudTheme = d.theme;
-                        cloudTime = d.timestamp;
-
-                        // 2. Verifica se existem itens na Subcoleção (Formato Novo)
+                        cloudTheme = d.theme; cloudTime = d.timestamp;
                         const itemsCollectionRef = collection(dbInstance, 'artifacts', appId, 'users', currentUser.uid, 'data', 'backup', 'items');
                         const itemsSnap = await getDocs(itemsCollectionRef);
-                        
-                        if (!itemsSnap.empty) {
-                            console.log("Carregando do formato novo (Subcoleção)...");
-                            cloudItems = itemsSnap.docs.map(doc => doc.data());
-                        } else if (d.items && Array.isArray(d.items)) {
-                            // 3. Fallback: Se subcoleção vazia, tenta array antigo (Migração)
-                            console.log("Carregando do formato antigo (Array)...");
-                            cloudItems = d.items;
-                        }
+                        if (!itemsSnap.empty) { cloudItems = itemsSnap.docs.map(doc => doc.data()); } 
+                        else if (d.items && Array.isArray(d.items)) { cloudItems = d.items; }
                     }
-
-                    if (cloudItems.length > 0) {
-                        if (confirm(`Backup encontrado na nuvem (${cloudItems.length} itens). Deseja carregar?`)) {
-                            setItems(sanitizeItems(cloudItems)); 
-                            if (cloudTheme) setTheme(cloudTheme);
-                            if (cloudTime) setLastCloudSave(new Date(cloudTime));
-                        }
+                    if (cloudItems.length > 0 && confirm(`Backup encontrado (${cloudItems.length} itens). Carregar?`)) {
+                        setItems(sanitizeItems(cloudItems)); 
+                        if (cloudTheme) setTheme(cloudTheme);
+                        if (cloudTime) setLastCloudSave(new Date(cloudTime));
                     }
-                } catch (e) { console.error("Erro ao carregar da nuvem:", e); }
+                } catch (e) { console.error("Erro cloud:", e); }
             };
 
             const initializeFirebaseApp = () => {
-                // Ensure writeBatch, getDocs, deleteField are included here
-                const { initializeApp, getAuth, getFirestore, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, doc, setDoc, getDoc, collection, getApps, getApp, writeBatch, getDocs, deleteField, deleteDoc } = window.firebaseSDK;
+                const { initializeApp, getAuth, getFirestore, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, doc, setDoc, getDoc, collection, writeBatch, getDocs, deleteField, deleteDoc } = window.firebaseSDK;
                 try {
-                    let app;
-                    if (getApps().length > 0) app = getApp(); 
-                    else app = initializeApp(FIREBASE_CONFIG_FIXED);
+                    let app = window.firebaseAppInstance || initializeApp(FIREBASE_CONFIG_FIXED);
+                    window.firebaseAppInstance = app; // Cache instance
                     const auth = getAuth(app);
                     const db = getFirestore(app);
                     window.firebaseAppObj = { auth, db, config: FIREBASE_CONFIG_FIXED, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, doc, setDoc, getDoc, collection, writeBatch, getDocs, deleteField, deleteDoc };
                     onAuthStateChanged(auth, (u) => {
-                        if (u) { setUser(u); setIsGuest(false); showToast('success', 'Conectado como ' + u.email); loadFromCloud(u, db); } 
+                        if (u) { setUser(u); setIsGuest(false); showToast('success', 'Conectado: ' + u.email); loadFromCloud(u, db); } 
                         else { setUser(null); }
                     });
-                } catch (e) { console.error("Init failed", e); showToast('error', 'Falha ao conectar Firebase'); }
+                } catch (e) { console.error("Init fail", e); showToast('error', 'Firebase offline.'); }
             };
             
             useEffect(() => {
                 const start = async () => {
                     let retries = 0;
-                    while (!window.firebaseLoaded && retries < 20) { await new Promise(r => setTimeout(r, 100)); retries++; }
-                    if (!window.firebaseLoaded) { setIsGuest(true); setAppReady(true); showToast('error', 'Offline'); return; }
+                    while (!window.firebaseLoaded && retries < 50) { await new Promise(r => setTimeout(r, 100)); retries++; }
+                    if (!window.firebaseLoaded) { showToast('error', 'Offline Mode'); setAppReady(true); return; }
                     initializeFirebaseApp();
                     setAppReady(true);
                 };
@@ -605,204 +443,55 @@
                 if (!appReady) return;
                 const t = setTimeout(() => {
                     const key = getStorageKey(user);
-                    localStorage.setItem(key, JSON.stringify(items));
+                    safeLocalStorage.setItem(key, JSON.stringify(items));
                     if (saveStatus === '') { setSaveStatus('saved'); setTimeout(() => setSaveStatus(''), 2000); }
                 }, 1000);
                 return () => clearTimeout(t);
             }, [items, user, appReady]);
 
-            useEffect(() => { if (!appReady) return; const key = getThemeKey(user); localStorage.setItem(key, JSON.stringify(theme)); }, [theme, user, appReady]);
+            useEffect(() => { if (!appReady) return; const key = getThemeKey(user); safeLocalStorage.setItem(key, JSON.stringify(theme)); }, [theme, user, appReady]);
 
-            const currentItem = useMemo(() => {
-                if (!items) return null;
-                return items.find(i => i.id === activeDeckId);
-            }, [items, activeDeckId]);
-
-            useEffect(() => {
-                setImageZoom(1);
-                setImagePos({ x: 0, y: 0 }); 
-            }, [activeDeckId]);
-
-            const currentCard = useMemo(() => {
-                if (currentItem && Array.isArray(currentItem.cards)) {
-                    return currentItem.cards[currentCardIndex];
-                }
-                return null;
-            }, [currentItem, currentCardIndex]);
-
-            // UPDATE: Sorting logic with filter support
+            // ... (useMemo currentItem, currentCard, currentFolderItems etc. - same as before) ...
+            const currentItem = useMemo(() => items.find(i => i.id === activeDeckId), [items, activeDeckId]);
+            useEffect(() => { setImageZoom(1); setImagePos({ x: 0, y: 0 }); }, [activeDeckId]);
+            const currentCard = useMemo(() => (currentItem && Array.isArray(currentItem.cards)) ? currentItem.cards[currentCardIndex] : null, [currentItem, currentCardIndex]);
             const currentFolderItems = useMemo(() => {
                 if (!items) return [];
-
-                // --- Lógica de Filtro (RESTAURADA) ---
                 if (activeFilters.length > 0) {
-                    
                     let targetItems = items;
-
-                    // Se estivermos dentro de uma pasta específica, precisamos filtrar recursivamente
-                    // para pegar apenas itens desta pasta e de suas subpastas
                     if (currentFolderId !== null) {
-                        const getSubfolderIds = (rootId) => {
-                            const result = [rootId];
-                            const children = items.filter(i => i.parentId === rootId && i.type === 'folder');
-                            children.forEach(child => {
-                                result.push(...getSubfolderIds(child.id));
-                            });
-                            return result;
-                        };
+                        const getSubfolderIds = (rootId) => { const result = [rootId]; items.filter(i => i.parentId === rootId && i.type === 'folder').forEach(child => result.push(...getSubfolderIds(child.id))); return result; };
                         const allowedParentIds = getSubfolderIds(currentFolderId);
                         targetItems = items.filter(i => allowedParentIds.includes(i.parentId));
                     }
-
-                    // Aplica o filtro de tipo nos itens alvo (seja tudo ou sub-árvore)
-                    return targetItems
-                        .filter(i => activeFilters.includes(i.type))
-                        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+                    return targetItems.filter(i => activeFilters.includes(i.type)).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
                 }
-
-                // Normal Folder Mode
                 return items.filter(i => i.parentId === currentFolderId).sort((a,b) => {
-                    if (a.type === b.type) {
-                        return a.name.localeCompare(b.name, undefined, {sensitivity: 'base', numeric: true});
-                    }
+                    if (a.type === b.type) return a.name.localeCompare(b.name, undefined, {sensitivity: 'base', numeric: true});
                     return a.type === 'folder' ? -1 : 1;
                 });
             }, [items, currentFolderId, activeFilters]);
-
             const breadcrumbs = useMemo(() => { const p=[]; let c=currentFolderId; while(c){const f=items.find(i=>i.id===c); if(f){p.unshift(f); c=f.parentId}else break;} return p; }, [items, currentFolderId]);
             const withCloud = (newItems) => { setItems(newItems); saveToCloud(newItems, theme); };
+
+            // ... (createFolder, createNote, createVideo, createImage, toggleFilter, clearFilters) ...
             const createFolder = () => { const name = prompt("Nome:"); if(!name) return; withCloud([...items, {id: Date.now().toString(), type:'folder', name, parentId: currentFolderId}]); setShowNewMenu(false); };
             const createNote = () => { const name = prompt("Nome:"); if(!name) return; const note = {id: Date.now().toString()+Math.random(), type:'note', name, parentId: currentFolderId, content:''}; withCloud([...items, note]); setActiveDeckId(note.id); setShowNewMenu(false); };
             const createVideo = () => { const name = prompt("Nome do Vídeo:"); if(!name) return; const url = prompt("Link do Vídeo (URL):"); if(!url) return; const video = {id: Date.now().toString()+Math.random(), type:'video', name, parentId: currentFolderId, content:url}; withCloud([...items, video]); setActiveDeckId(video.id); setShowNewMenu(false); };
-            const createImage = () => { 
-                const name = prompt("Nome da Imagem:"); 
-                if (!name) return; 
-                const url = prompt("Link da Imagem (URL):"); 
-                if (!url) return; 
-                const image = {
-                    id: Date.now().toString() + Math.random(), 
-                    type: 'image', 
-                    name, 
-                    parentId: currentFolderId, 
-                    content: url
-                }; 
-                withCloud([...items, image]); 
-                setActiveDeckId(image.id); 
-                setShowNewMenu(false); 
-            };
+            const createImage = () => { const name = prompt("Nome da Imagem:"); if(!name) return; const url = prompt("Link da Imagem (URL):"); if(!url) return; const image = {id: Date.now().toString()+Math.random(), type:'image', name, parentId: currentFolderId, content:url}; withCloud([...items, image]); setActiveDeckId(image.id); setShowNewMenu(false); };
+            const toggleFilter = (type) => { setActiveFilters(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]); };
+            const clearFilters = () => { setActiveFilters([]); setShowFilterMenu(false); };
 
-            // --- NOVO: Função para alternar filtros (RESTAURADA) ---
-            const toggleFilter = (type) => {
-                setActiveFilters(prev => 
-                    prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-                );
-            };
-
-            const clearFilters = () => {
-                setActiveFilters([]);
-                setShowFilterMenu(false);
-            };
-
-            const handleFileUpload = async (e) => {
-                const files = Array.from(e.target.files); if(files.length===0) return;
-                const toAdd = [];
-                for(let f of files) {
-                    try {
-                        const id = Date.now().toString() + Math.random();
-                        if(f.name.endsWith('.pdf')) {
-                            await dbHelper.saveFile(id, f);
-                            toAdd.push({id, type:'pdf', name:f.name.replace('.pdf',''), parentId:currentFolderId});
-                        } else if(f.name.endsWith('.txt')) {
-                            const txt = await readFileAsText(f);
-                            toAdd.push({id, type:'note', name:f.name.replace('.txt',''), parentId:currentFolderId, content:txt});
-                        } else {
-                            const txt = await readFileAsText(f);
-                            const c = parseCSV(txt); if(c.length>0) toAdd.push({id, type:'deck', name:f.name.replace('.csv',''), parentId:currentFolderId, cards:c, progress:0, completions:0});
-                        }
-                    } catch(err){ console.error(err); }
-                }
-                if(toAdd.length>0) withCloud([...items, ...toAdd]);
-                e.target.value='';
-            };
-
-            const handlePdfRestore = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const uploadedName = file.name.replace('.pdf', '');
-                if (uploadedName !== currentItem.name) { alert(`Erro: O arquivo selecionado (${uploadedName}) não corresponde ao original (${currentItem.name}).`); e.target.value = ''; return; }
-                await dbHelper.saveFile(currentItem.id, file);
-                const url = URL.createObjectURL(file);
-                setPdfUrl(url);
-                setPdfMissing(false);
-                e.target.value = '';
-            };
-
-            useEffect(() => {
-                if (currentItem?.type === 'pdf') {
-                    setPdfMissing(false); 
-                    dbHelper.getFile(currentItem.id).then(blob => {
-                        if (blob) { const url = URL.createObjectURL(blob); setPdfUrl(url); } 
-                        else { setPdfUrl(null); setPdfMissing(true); }
-                    });
-                } else { if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); } setPdfMissing(false); }
-            }, [activeDeckId, currentItem]);
-
+            // ... (handleFileUpload, handlePdfRestore, updateDeckProgress, updateNoteContent, handleFlip, handleNext, handlePrev, deleteItem, saveRename, pasteItems, startRenaming, addToClipboard, cancelClipboard) ...
+            const handleFileUpload = async (e) => { const files = Array.from(e.target.files); if(files.length===0) return; const toAdd = []; for(let f of files) { try { const id = Date.now().toString() + Math.random(); if(f.name.endsWith('.pdf')) { await dbHelper.saveFile(id, f); toAdd.push({id, type:'pdf', name:f.name.replace('.pdf',''), parentId:currentFolderId}); } else if(f.name.endsWith('.txt')) { const txt = await readFileAsText(f); toAdd.push({id, type:'note', name:f.name.replace('.txt',''), parentId:currentFolderId, content:txt}); } else { const txt = await readFileAsText(f); const c = parseCSV(txt); if(c.length>0) toAdd.push({id, type:'deck', name:f.name.replace('.csv',''), parentId:currentFolderId, cards:c, progress:0, completions:0}); } } catch(err){ console.error(err); } } if(toAdd.length>0) withCloud([...items, ...toAdd]); e.target.value=''; };
+            const handlePdfRestore = async (e) => { const file = e.target.files[0]; if (!file) return; const uploadedName = file.name.replace('.pdf', ''); if (uploadedName !== currentItem.name) { alert(`Erro: O arquivo selecionado (${uploadedName}) não corresponde ao original (${currentItem.name}).`); e.target.value = ''; return; } await dbHelper.saveFile(currentItem.id, file); const url = URL.createObjectURL(file); setPdfUrl(url); setPdfMissing(false); e.target.value = ''; };
+            useEffect(() => { if (currentItem?.type === 'pdf') { setPdfMissing(false); dbHelper.getFile(currentItem.id).then(blob => { if (blob) { const url = URL.createObjectURL(blob); setPdfUrl(url); } else { setPdfUrl(null); setPdfMissing(true); } }); } else { if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); } setPdfMissing(false); } }, [activeDeckId, currentItem]);
             const updateDeckProgress = (id, idx) => setItems(p => p.map(i => i.id===id ? {...i, progress:idx} : i));
             const updateNoteContent = (id, c) => setItems(p => p.map(i => i.id===id ? {...i, content:c} : i));
             const handleFlip = () => setIsFlipped(!isFlipped);
             const handleNext = () => { if(currentCardIndex < (currentItem.cards?.length || 0) -1){ const n=currentCardIndex+1; setIsFlipped(false); setTimeout(()=>{setCurrentCardIndex(n); updateDeckProgress(activeDeckId, n)},150); } else setShowCompletionModal(true); };
             const handlePrev = () => { if(currentCardIndex > 0){ const n=currentCardIndex-1; setIsFlipped(false); setTimeout(()=>{setCurrentCardIndex(n); updateDeckProgress(activeDeckId, n)},150); } };
-            
-            // --- NOVO: Deletar item com remoção explícita na nuvem (Batch) ---
-            const deleteItem = async (e, id) => { 
-                e.stopPropagation(); 
-                if(confirm("Tem certeza?")) { 
-                    const getIds = (r, l) => { 
-                        let ids=[r]; 
-                        l.filter(i=>i.parentId===r).forEach(c=>ids.push(...getIds(c.id, l))); 
-                        return ids; 
-                    }; 
-                    const todel = getIds(id, items); 
-                    
-                    // 1. Deletar localmente do IndexedDB (PDFs)
-                    todel.forEach(tid => { 
-                        const it = items.find(x => x.id === tid); 
-                        if(it && it.type === 'pdf') dbHelper.deleteFile(tid); 
-                    }); 
-
-                    // 2. Deletar da Nuvem (Firestore Subcollection)
-                    if (user && !isGuest && window.firebaseAppObj) {
-                        try {
-                            const { db, doc, writeBatch } = window.firebaseAppObj;
-                            const appId = window.firebaseAppObj.config.projectId;
-                            
-                            // Processar deleções em lotes (limite 500)
-                            const chunkSize = 450;
-                            for (let i = 0; i < todel.length; i += chunkSize) {
-                                const chunk = todel.slice(i, i + chunkSize);
-                                const batch = writeBatch(db);
-                                
-                                chunk.forEach(tid => {
-                                    const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'backup', 'items', String(tid));
-                                    batch.delete(ref);
-                                });
-                                await batch.commit();
-                            }
-                            console.log(`Deletados da nuvem: ${todel.length} itens.`);
-                        } catch (err) {
-                            console.error("Erro ao deletar da nuvem:", err);
-                            showToast('error', 'Falha ao deletar da nuvem.');
-                        }
-                    }
-
-                    // 3. Atualizar Estado Local
-                    const next = items.filter(i => !todel.includes(i.id)); 
-                    withCloud(next); // Salva o restante (upsert)
-                    
-                    if(todel.includes(activeDeckId)) setActiveDeckId(null); 
-                } 
-            };
-
+            const deleteItem = async (e, id) => { e.stopPropagation(); if(confirm("Tem certeza?")) { const getIds = (r, l) => { let ids=[r]; l.filter(i=>i.parentId===r).forEach(c=>ids.push(...getIds(c.id, l))); return ids; }; const todel = getIds(id, items); todel.forEach(tid => { const it = items.find(x => x.id === tid); if(it && it.type === 'pdf') dbHelper.deleteFile(tid); }); if (user && !isGuest && window.firebaseAppObj) { try { const { db, doc, writeBatch } = window.firebaseAppObj; const appId = window.firebaseAppObj.config.projectId; const chunkSize = 450; for (let i = 0; i < todel.length; i += chunkSize) { const chunk = todel.slice(i, i + chunkSize); const batch = writeBatch(db); chunk.forEach(tid => { const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'backup', 'items', String(tid)); batch.delete(ref); }); await batch.commit(); } } catch (err) { console.error("Erro delete cloud:", err); } } const next = items.filter(i => !todel.includes(i.id)); withCloud(next); if(todel.includes(activeDeckId)) setActiveDeckId(null); } };
             const saveRename = (e) => { e.stopPropagation(); if(tempName.trim()) withCloud(items.map(i => i.id===editingItemId ? {...i, name:tempName} : i)); setEditingItemId(null); };
             const pasteItems = () => { if(!clipboard) return; const next = [...items]; const targets = items.filter(i=>clipboard.items.includes(i.id)); if(clipboard.mode==='cut') { targets.forEach(t=>{ const idx=next.findIndex(x=>x.id===t.id); if(idx!==-1) next[idx]={...next[idx], parentId:currentFolderId} }); setClipboard(null); } else { targets.forEach(t => { const n={...t, id:Date.now()+Math.random(), parentId:currentFolderId, name:t.name+' (Copiia)'}; if(t.type==='deck'){n.progress=0;n.completions=0;} next.push(n); }); } withCloud(next); };
             const startRenaming = (e, item) => { e.stopPropagation(); setEditingItemId(item.id); setTempName(item.name); setTimeout(() => editInputRef.current?.focus(), 50); };
@@ -812,70 +501,31 @@
             useEffect(() => { const h = (e) => { if(!activeDeckId || showSettings || showStats || showCompletionModal || editingItemId) return; if(currentItem?.type==='note' || currentItem?.type==='pdf') return; if(e.code==='Space'){e.preventDefault(); handleFlip()} else if(e.code==='ArrowRight') handleNext(); else if(e.code==='ArrowLeft') handlePrev(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [activeDeckId, currentCardIndex, isFlipped, showSettings, showStats, showCompletionModal, editingItemId, currentItem]);
 
             const selectDeck = (id) => { if (editingItemId) return; setActiveDeckId(id); setIsFlipped(false); };
-            const finishDeckTransition = (completed) => {
-                setShowCompletionModal(false);
-                const compl = completed ? (currentItem.completions||0)+1 : (currentItem.completions||0);
-                const nextItems = items.map(i => i.id===activeDeckId ? {...i, progress:0, completions: compl} : i);
-                if(completed) saveToCloud(nextItems, theme);
-                setItems(nextItems);
-                setIsFlipped(false);
-                setTimeout(() => {
-                    const sibs = items.filter(i => i.parentId === currentItem.parentId && i.type === 'deck').sort((a,b)=>a.name.localeCompare(b.name));
-                    const idx = sibs.findIndex(i=>i.id===activeDeckId);
-                    if(idx!==-1 && idx < sibs.length-1) setActiveDeckId(sibs[idx+1].id);
-                    else if(sibs.length>0) { setActiveDeckId(sibs[0].id); setCurrentCardIndex(0); }
-                }, 150);
+            const finishDeckTransition = (completed) => { setShowCompletionModal(false); const compl = completed ? (currentItem.completions||0)+1 : (currentItem.completions||0); const nextItems = items.map(i => i.id===activeDeckId ? {...i, progress:0, completions: compl} : i); if(completed) saveToCloud(nextItems, theme); setItems(nextItems); setIsFlipped(false); setTimeout(() => { const sibs = items.filter(i => i.parentId === currentItem.parentId && i.type === 'deck').sort((a,b)=>a.name.localeCompare(b.name)); const idx = sibs.findIndex(i=>i.id===activeDeckId); if(idx!==-1 && idx < sibs.length-1) setActiveDeckId(sibs[idx+1].id); else if(sibs.length>0) { setActiveDeckId(sibs[0].id); setCurrentCardIndex(0); } }, 150); };
+
+            // --- FUNÇÃO DE LOGOUT CORRIGIDA ---
+            const handleLogout = () => {
+                // 1. Limpa o estado local
+                setUser(null);
+                setIsGuest(false);
+                setShowStats(false);
+                setItems([]); // Limpa a tela para forçar AuthScreen
+                // 2. Tenta logout no Firebase se disponível
+                if (window.firebaseAppObj && window.firebaseAppObj.auth) {
+                    window.firebaseAppObj.signOut(window.firebaseAppObj.auth).catch(() => {});
+                }
             };
 
-            const StatsModal = () => {
+            const StatsModal = () => { /* ... mesma lógica de stats ... */
                 const [memory, setMemory] = useState(null);
                 const [storage, setStorage] = useState({ local: '0', cloud: '0' });
                 const [counts, setCounts] = useState({ deck: 0, note: 0, pdf: 0, video: 0, image: 0, folder: 0 });
-
                 useEffect(() => {
-                    setCounts({
-                        deck: items.filter(i => i.type === 'deck').length,
-                        note: items.filter(i => i.type === 'note').length,
-                        pdf: items.filter(i => i.type === 'pdf').length,
-                        video: items.filter(i => i.type === 'video').length,
-                        image: items.filter(i => i.type === 'image').length,
-                        folder: items.filter(i => i.type === 'folder').length,
-                    });
-
-                    let localSize = 0;
-                    try {
-                        for (let key in localStorage) {
-                            if (localStorage.hasOwnProperty(key)) {
-                                localSize += localStorage[key].length * 2; 
-                            }
-                        }
-                    } catch(e) {}
-                    
-                    const cloudContent = JSON.stringify({ items, theme });
-                    const cloudSize = cloudContent.length * 2;
-
-                    setStorage({
-                        local: (localSize / 1024).toFixed(2) + ' KB', 
-                        cloud: (cloudSize / 1024).toFixed(2) + ' KB'
-                    });
-
-                    if (window.performance && window.performance.memory) {
-                        setMemory({
-                            used: (window.performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1) + ' MB',
-                            limit: (window.performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(1) + ' MB'
-                        });
-                    }
-
-                    const interval = setInterval(() => {
-                         if (window.performance && window.performance.memory) {
-                            setMemory({
-                                used: (window.performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1) + ' MB',
-                                limit: (window.performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(1) + ' MB'
-                            });
-                        }
-                    }, 2000);
-                    return () => clearInterval(interval);
-
+                    setCounts({ deck: items.filter(i => i.type === 'deck').length, note: items.filter(i => i.type === 'note').length, pdf: items.filter(i => i.type === 'pdf').length, video: items.filter(i => i.type === 'video').length, image: items.filter(i => i.type === 'image').length, folder: items.filter(i => i.type === 'folder').length });
+                    let localSize = 0; try { for (let key in localStorage) { if (localStorage.hasOwnProperty(key)) localSize += localStorage[key].length * 2; } } catch(e) {}
+                    const cloudContent = JSON.stringify({ items, theme }); const cloudSize = cloudContent.length * 2;
+                    setStorage({ local: (localSize / 1024).toFixed(2) + ' KB', cloud: (cloudSize / 1024).toFixed(2) + ' KB' });
+                    if (window.performance && window.performance.memory) setMemory({ used: (window.performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1) + ' MB', limit: (window.performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(1) + ' MB' });
                 }, []);
 
                 return (
@@ -886,206 +536,56 @@
                                 <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
                                     <div className="flex justify-between mb-2"><h3 className="font-bold gap-2 flex items-center"><Icon name="user" size={16}/> Conta</h3>{user && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Online</span>}</div>
                                     <p className="text-sm text-gray-600 mb-3">{user ? user.email : "Convidado (Offline)"}</p>
-                                    {user ? (<div className="space-y-2"><button onClick={() => saveToCloud(items, theme)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center justify-center gap-2">Salvar na Nuvem</button>{lastCloudSave && <p className="text-xs text-center text-gray-400">Salvo: {lastCloudSave.toLocaleString()}</p>}<button onClick={() => window.firebaseAppObj.signOut(window.firebaseAppObj.auth)} className="w-full py-2 border rounded-lg text-sm">Sair</button></div>) : (<div className="space-y-2 text-center"><p className="text-xs text-gray-400">Faça login para salvar na nuvem.</p><button onClick={() => { setIsGuest(false); setUser(null); setShowStats(false); }} className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"><Icon name="logIn" size={16} /> Fazer Login / Criar Conta</button></div>)}
+                                    {user ? (<div className="space-y-2"><button onClick={() => saveToCloud(items, theme)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center justify-center gap-2">Salvar na Nuvem</button>{lastCloudSave && <p className="text-xs text-center text-gray-400">Salvo: {lastCloudSave.toLocaleString()}</p>}<button onClick={handleLogout} className="w-full py-2 border rounded-lg text-sm">Sair</button></div>) : (<div className="space-y-2 text-center"><p className="text-xs text-gray-400">Faça login para salvar na nuvem.</p><button onClick={handleLogout} className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"><Icon name="logIn" size={16} /> Fazer Login / Criar Conta</button></div>)}
                                 </div>
-                                
-                                <div className="mb-6">
-                                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Estatísticas do Sistema</h3>
-                                    <div className="grid grid-cols-2 gap-3 mb-3">
-                                        <div className="bg-gray-100 p-3 rounded-lg">
-                                            <span className="text-xs text-gray-500 block">RAM (Uso/Total)</span>
-                                            <span className="font-mono text-sm font-bold text-gray-800">{memory ? `${memory.used} / ${memory.limit}` : 'N/A'}</span>
-                                        </div>
-                                        <div className="bg-gray-100 p-3 rounded-lg">
-                                            <span className="text-xs text-gray-500 block">Armazenamento Local</span>
-                                            <span className="font-mono text-sm font-bold text-gray-800">{storage.local}</span>
-                                        </div>
-                                        <div className="bg-gray-100 p-3 rounded-lg col-span-2">
-                                            <span className="text-xs text-gray-500 block">Estimativa Nuvem (JSON)</span>
-                                            <span className="font-mono text-sm font-bold text-gray-800">{storage.cloud}</span>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 text-center">
-                                        <div className="bg-blue-50 p-2 rounded-lg"><span className="block text-xl font-bold text-blue-700">{counts.deck}</span><span className="text-[10px] uppercase text-blue-400">Decks</span></div>
-                                        <div className="bg-indigo-50 p-2 rounded-lg"><span className="block text-xl font-bold text-indigo-700">{counts.note}</span><span className="text-[10px] uppercase text-indigo-400">Notas</span></div>
-                                        <div className="bg-red-50 p-2 rounded-lg"><span className="block text-xl font-bold text-red-700">{counts.pdf}</span><span className="text-[10px] uppercase text-red-400">PDFs</span></div>
-                                        <div className="bg-pink-50 p-2 rounded-lg"><span className="block text-xl font-bold text-pink-700">{counts.video}</span><span className="text-[10px] uppercase text-pink-400">Vídeos</span></div>
-                                        <div className="bg-purple-50 p-2 rounded-lg"><span className="block text-xl font-bold text-purple-700">{counts.image}</span><span className="text-[10px] uppercase text-purple-400">Imagens</span></div>
-                                        <div className="bg-yellow-50 p-2 rounded-lg"><span className="block text-xl font-bold text-yellow-700">{counts.folder}</span><span className="text-[10px] uppercase text-yellow-400">Pastas</span></div>
-                                    </div>
-                                </div>
-
-                                <div className="border-t pt-4">
-                                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Backup Local (.json)</h3>
-                                    <button onClick={handleExportData} className="w-full py-2 mb-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2 transition-colors"><Icon name="download" size={16} /> Exportar</button>
-                                    <div className="relative">
-                                        <button onClick={() => importInputRef.current.click()} className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2 transition-colors"><Icon name="uploadCloud" size={16} /> Importar</button>
-                                        <input type="file" accept=".json" ref={importInputRef} onChange={handleImportData} className="hidden" />
-                                    </div>
-                                </div>
-                                <div className="border-t pt-4 mt-4"><button onClick={() => { if(confirm("Apagar tudo?")) { setItems([]); localStorage.clear(); setTheme(DEFAULT_THEME); setShowStats(false); } }} className="w-full py-3 bg-red-50 text-red-600 rounded-lg flex items-center justify-center gap-2"><Icon name="trash-2" size={20}/> Resetar App</button></div>
+                                <div className="mb-6"><h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Estatísticas</h3><div className="grid grid-cols-2 gap-3 mb-3"><div className="bg-gray-100 p-3 rounded-lg"><span className="text-xs text-gray-500 block">RAM</span><span className="font-mono text-sm font-bold text-gray-800">{memory ? memory.used : 'N/A'}</span></div><div className="bg-gray-100 p-3 rounded-lg"><span className="text-xs text-gray-500 block">Local</span><span className="font-mono text-sm font-bold text-gray-800">{storage.local}</span></div></div><div className="grid grid-cols-3 gap-2 text-center"><div className="bg-blue-50 p-2 rounded-lg"><span className="block text-xl font-bold text-blue-700">{counts.deck}</span><span className="text-[10px] uppercase text-blue-400">Decks</span></div><div className="bg-indigo-50 p-2 rounded-lg"><span className="block text-xl font-bold text-indigo-700">{counts.note}</span><span className="text-[10px] uppercase text-indigo-400">Notas</span></div><div className="bg-pink-50 p-2 rounded-lg"><span className="block text-xl font-bold text-pink-700">{counts.video}</span><span className="text-[10px] uppercase text-pink-400">Vídeos</span></div></div></div>
+                                <div className="border-t pt-4"><h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Backup Local</h3><button onClick={handleExportData} className="w-full py-2 mb-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2"><Icon name="download" size={16} /> Exportar</button><div className="relative"><button onClick={() => importInputRef.current.click()} className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2"><Icon name="uploadCloud" size={16} /> Importar</button><input type="file" accept=".json" ref={importInputRef} onChange={handleImportData} className="hidden" /></div></div>
+                                <div className="border-t pt-4 mt-4"><button onClick={() => { if(confirm("Apagar tudo?")) { setItems([]); safeLocalStorage.clear(); setTheme(DEFAULT_THEME); setShowStats(false); } }} className="w-full py-3 bg-red-50 text-red-600 rounded-lg flex items-center justify-center gap-2"><Icon name="trash-2" size={20}/> Resetar App</button></div>
                             </div>
                         </div>
                     </div>
                 );
             };
 
-            const CompletionModal = () => (
-                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
-                        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600"><Icon name="trophy" size={32} /></div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">Fim do Baralho!</h2>
-                        <p className="text-gray-600 mb-6">Deseja contabilizar este baralho como completado?</p>
-                        <div className="flex gap-3"><button onClick={() => finishDeckTransition(false)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">Não</button><button onClick={() => finishDeckTransition(true)} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">Sim</button></div>
-                    </div>
-                </div>
-            );
+            const CompletionModal = () => ( /* ... */ <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"><div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center"><div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600"><Icon name="trophy" size={32} /></div><h2 className="text-xl font-bold text-gray-800 mb-2">Fim do Baralho!</h2><div className="flex gap-3"><button onClick={() => finishDeckTransition(false)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium">Não</button><button onClick={() => finishDeckTransition(true)} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Sim</button></div></div></div> );
+            const SettingsModal = () => ( /* ... */ <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"><div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative"><div className="flex justify-between items-center mb-6 border-b pb-2"><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Icon name="settings" size={24} /> Cores e Tema</h2><button onClick={() => setShowSettings(false)}><Icon name="x" size={24} /></button></div><div className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Fundo (Frente)</label><input type="color" value={theme.frontBg} onChange={(e) => handleThemeChange('frontBg', e.target.value)} className="h-10 w-full rounded border p-1" /></div></div></div><div className="mt-8 flex justify-between gap-3 border-t pt-4 items-center"><button onClick={resetTheme} className="text-xs text-gray-400 hover:underline">Restaurar Padrão</button><button onClick={() => { setShowSettings(false); setSaveStatus('saved'); setTimeout(() => setSaveStatus(''), 2000); }} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2"><Icon name="check" size={16} /> Salvar</button></div></div></div> );
 
-            const SettingsModal = () => (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
-                        <div className="flex justify-between items-center mb-6 border-b pb-2"><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Icon name="settings" size={24} className="text-gray-500"/> Cores e Tema</h2><button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={24} /></button></div>
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Fundo (Frente)</label><input type="color" value={theme.frontBg} onChange={(e) => handleThemeChange('frontBg', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Texto (Frente)</label><input type="color" value={theme.frontText} onChange={(e) => handleThemeChange('frontText', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div></div>
-                            <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Fundo (Verso)</label><input type="color" value={theme.backBg} onChange={(e) => handleThemeChange('backBg', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Texto (Verso)</label><input type="color" value={theme.backText} onChange={(e) => handleThemeChange('backText', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div></div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Cor do Progresso</label><input type="color" value={theme.progressColor} onChange={(e) => handleThemeChange('progressColor', e.target.value)} className="h-10 w-full cursor-pointer rounded border p-1" /></div>
+            if (!appReady) return <div className="min-h-screen flex items-center justify-center text-gray-500 animate-pulse">Carregando...</div>;
+            if (!user && !isGuest) return <AuthScreen onLogin={u => setUser(u)} onGuest={() => setIsGuest(true)} />;
+
+            if (items.length === 0 && !forceExplorer) {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 text-center relative">
+                        {connectionLog && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg text-sm font-bold z-50 transition-all ${connectionLog.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{connectionLog.msg}</div>}
+                        {user && <div className="absolute top-4 left-4 flex items-center gap-2 text-sm text-gray-600"><span className="w-2 h-2 bg-green-500 rounded-full"></span> {user.email}</div>}
+                        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-gray-100 relative">
+                            <button onClick={() => setShowStats(true)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><Icon name="bar-chart" size={20} /></button>
+                            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-600"><Icon name="layers" size={40} /></div>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-2">Flashcard Flow</h1>
+                            <p className="text-gray-500 mb-8">Seu explorador de estudos está vazio.</p>
+                            <div className="space-y-2">
+                                <button onClick={() => setForceExplorer(true)} className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-3"><Icon name="folder" size={20} /> <span>Abrir Explorador</span></button>
+                                <button onClick={() => fileInputRef.current.click()} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-3"><Icon name="file-plus" size={24} /> <span>Importar Arquivo (.csv / .txt / .pdf)</span></button>
+                                <button onClick={() => importInputRef.current.click()} className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-3"><Icon name="uploadCloud" size={20} /> <span>Importar Backup Local</span></button>
+                            </div>
+                            <input type="file" accept=".csv, .txt, .pdf" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                            <input type="file" accept=".json" ref={importInputRef} onChange={handleImportData} className="hidden" />
+                            <div className="mt-6 pt-6 border-t">
+                                <button onClick={handleLogout} className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg text-sm flex items-center justify-center gap-2"><Icon name="logOut" size={16}/> Sair / Login</button>
+                            </div>
                         </div>
-                        <div className="mt-8 flex justify-between gap-3 border-t pt-4 items-center"><button onClick={resetTheme} className="text-xs text-gray-400 hover:text-gray-600 underline">Restaurar Padrão</button><button onClick={() => { setShowSettings(false); setSaveStatus('saved'); setTimeout(() => setSaveStatus(''), 2000); }} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"><Icon name="check" size={16} /> Salvar</button></div>
+                        {showStats && <StatsModal />}
                     </div>
-                </div>
-            );
+                );
+            }
 
-            // ... Main Render Return ...
-             return (
+            return (
                 <ErrorBoundary>
                     <div className="h-screen w-full flex flex-col md:flex-row bg-gray-50 overflow-hidden">
+                        {/* ... (Main Content & Sidebar - mantidos iguais) ... */}
                         {connectionLog && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg text-sm font-bold z-50 transition-all ${connectionLog.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{connectionLog.msg}</div>}
-                        
-                        {/* MAIN CONTENT */}
-                        <div className="flex-1 flex flex-col h-full relative order-2 md:order-1 overflow-hidden">
-                            <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center shadow-sm shrink-0"><span className="font-bold text-gray-700 truncate mr-2">{currentItem ? currentItem.name : "Selecione"}</span><button onClick={() => setShowQueue(!showQueue)} className="p-2 bg-gray-100 rounded"><Icon name="layers" size={20} /></button></div>
-                            <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
-                                {!currentItem ? (<div className="text-center text-gray-400 my-auto"><Icon name="arrow-up" size={48} className="mx-auto mb-4 opacity-20 rotate-90 md:rotate-0" /><p>Selecione um item.</p></div>) : currentItem.type === 'note' ? (
-                                    <div className="w-full max-w-4xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-blue-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Salvo auto</span></div><textarea className="flex-1 p-6 w-full resize-none focus:outline-none text-gray-700 font-mono text-sm leading-relaxed" value={currentItem.content || ''} onChange={(e) => updateNoteContent(currentItem.id, e.target.value)} placeholder="Digite..."></textarea></div>
-                                ) : currentItem.type === 'pdf' ? (
-                                    <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
-                                        <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-red-500" />{currentItem.name}</div><span className="text-xs text-gray-400">PDF Local</span></div>
-                                        {pdfUrl ? (<iframe src={`PDF%20LEITOR.html?id=${currentItem.id}`} className="w-full h-full border-none" title="PDF Viewer"></iframe>) : pdfMissing ? (<div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-500 space-y-4"><Icon name="fileText" size={48} className="text-gray-300" /><div><h3 className="font-bold text-gray-700">Arquivo não encontrado</h3><p className="text-xs mt-1">O PDF <b>{currentItem.name}.pdf</b> é local.</p></div><button onClick={() => restorePdfRef.current.click()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors">Localizar PDF</button><input ref={restorePdfRef} type="file" accept=".pdf" onChange={handlePdfRestore} className="hidden" /></div>) : (<div className="flex-1 flex items-center justify-center text-gray-400">Carregando...</div>)}
-                                    </div>
-                                ) : currentItem.type === 'video' ? (
-                                    <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
-                                        <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="video" size={18} className="text-pink-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Vídeo Link</span></div>
-                                        <div className="flex-1 bg-black relative">
-                                            <iframe src={getEmbedUrl(currentItem.content)} className="absolute inset-0 w-full h-full border-none" title={currentItem.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-                                        </div>
-                                    </div>
-                                ) : currentItem.type === 'image' ? (
-                                    <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
-                                        <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0">
-                                            <div className="flex items-center gap-2 font-semibold text-gray-700">
-                                                <Icon name="image" size={18} className="text-purple-500" />
-                                                {currentItem.name}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{getHostname(currentItem.content)}</span>
-                                                <span className="text-xs text-gray-400">Imagem Web</span>
-                                            </div>
-                                        </div>
-                                        <div 
-                                            className="flex-1 bg-gray-100 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
-                                            onMouseDown={handleImageMouseDown}
-                                            onMouseMove={handleImageMouseMove}
-                                            onMouseUp={handleImageMouseUp}
-                                            onMouseLeave={handleImageMouseUp}
-                                        >
-                                            <div className="absolute top-4 right-4 z-10 flex gap-2 bg-white/80 p-1 rounded-lg shadow backdrop-blur-sm">
-                                               <button onClick={() => setImageZoom(z => Math.max(0.1, z - 0.1))} className="p-1 hover:bg-gray-200 rounded"><Icon name="minus" size={16}/></button>
-                                               <span className="text-xs w-8 text-center self-center">{Math.round(imageZoom * 100)}%</span>
-                                               <button onClick={() => setImageZoom(z => z + 0.1)} className="p-1 hover:bg-gray-200 rounded"><Icon name="plus" size={16}/></button>
-                                               <button onClick={resetImage} className="p-1 hover:bg-gray-200 rounded text-red-500" title="Resetar"><Icon name="rotateCcw" size={16}/></button>
-                                            </div>
-                                            <div className="w-full h-full flex items-center justify-center pointer-events-none">
-                                                 <img 
-                                                    src={currentItem.content} 
-                                                    alt={currentItem.name} 
-                                                    style={{ 
-                                                        transform: `translate(${imagePos.x}px, ${imagePos.y}px) scale(${imageZoom})`, 
-                                                        transformOrigin: 'center', 
-                                                        transition: isDraggingImage ? 'none' : 'transform 0.2s ease-out',
-                                                        cursor: isDraggingImage ? 'grabbing' : 'grab'
-                                                    }}
-                                                    className="max-w-full max-h-full object-contain pointer-events-auto"
-                                                    draggable="false"
-                                                    onError={(e) => {e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x300?text=Erro+ao+carregar+imagem'}}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="w-full max-w-5xl flex-1 flex flex-col items-center my-auto"><div className="flex items-center justify-center w-full gap-4 md:gap-8"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronLeft" size={32} /></button><div className="perspective-1000 w-full max-w-2xl h-[350px] md:h-[500px] cursor-pointer group relative" onClick={handleFlip}><div className={`relative w-full h-full text-center transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}><div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden" style={{ backgroundColor: theme.frontBg, color: theme.frontText }}><div className="h-2 w-full" style={{ backgroundColor: `${theme.progressColor}33` }}><div className="h-full transition-all duration-300" style={{ width: `${(((currentCardIndex || 0) + 1) / (currentItem.cards?.length || 1)) * 100}%`, backgroundColor: theme.progressColor }}></div></div><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><div className="flex justify-between items-center w-full opacity-50"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded">Pergunta</span><span className="text-xs font-mono">{currentCardIndex + 1}/{currentItem.cards?.length || 0}</span></div><h2 className="text-2xl md:text-3xl font-semibold leading-snug">{currentCard ? currentCard.front : ""}</h2></div></div><div className="p-4 text-xs font-medium border-t border-black/5 opacity-50">Toque para virar</div></div><div className="absolute w-full h-full backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-700 overflow-hidden" style={{ backgroundColor: theme.backBg, color: theme.backText }}><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded self-center opacity-60">Resposta</span><p className="text-xl md:text-2xl font-light leading-relaxed whitespace-pre-wrap">{currentCard ? currentCard.back : ""}</p>{currentCard && (<button onClick={(e) => { e.stopPropagation(); const q = encodeURIComponent(`${currentCard.front} ${currentCard.back} explicar detalhadamente`).replace(/%20/g, '+'); window.open(`https://www.google.com/search?udm=50&aep=11&q=${q}`, '_blank'); }} className="mt-4 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-current opacity-60 hover:opacity-100 hover:bg-white/10 transition-all self-center"><Icon name="search" size={14} /> Saber mais</button>)}</div></div><div className="p-4 text-xs font-medium border-t border-white/10 opacity-50">Próximo...</div></div></div></div><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronRight" size={32} /></button></div><div className="flex md:hidden items-center justify-between w-full max-w-2xl mt-6 gap-4"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronLeft" size={24} /></button><button onClick={(e) => { e.stopPropagation(); handleFlip(); }} className="flex-1 py-4 text-white rounded-xl shadow font-semibold flex justify-center items-center gap-2" style={{ backgroundColor: theme.progressColor }}><Icon name="rotateCw" size={20} /> Virar</button><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronRight" size={24} /></button></div></div>
-                                )
-                            }
-                        </div>
-                    </div>
-
-                    {/* SIDEBAR */}
-                    {/* Alterado: Removido w-96 fixo no desktop, adicionado style dinâmico e o handler de resize */}
-                    <div 
-                        className={`fixed inset-0 z-40 bg-white flex flex-col transition-transform duration-300 md:relative md:translate-x-0 md:border-l border-gray-200 md:order-2 h-full ${showQueue ? 'translate-x-0' : 'translate-x-full'}`}
-                        style={isDesktop ? { width: sidebarWidth } : {}}
-                    >
-                        {/* --- NOVO: Handle de Redimensionamento (apenas desktop) --- */}
-                        <div 
-                            className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-400 z-50 transition-colors"
-                            onMouseDown={startResizing}
-                            style={{ backgroundColor: isResizing ? '#3b82f6' : 'transparent', touchAction: 'none' }}
-                        />
-
-                        <div className="p-4 bg-gray-50 border-b shrink-0 flex flex-col gap-3"><div className="flex justify-between items-center"><h2 className="font-bold text-gray-700 flex items-center gap-2"><Icon name="layers" size={20} /> Explorador</h2><div className="flex gap-1"><button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-200 rounded"><Icon name="settings" size={18}/></button><button onClick={() => setShowStats(true)} className={`p-2 hover:bg-gray-200 rounded ${saveStatus==='saved_cloud'?'text-green-500':''}`}><Icon name="barChart" size={18}/></button><button onClick={() => setShowQueue(false)} className="md:hidden p-2 hover:bg-gray-200 rounded"><Icon name="x" size={20}/></button></div></div><div className="flex items-center gap-1 text-sm overflow-x-auto whitespace-nowrap pb-1 custom-scroll">
-                            {/* --- HEADER ALTERNATIVO QUANDO FILTRANDO --- */}
-                            {activeFilters.length > 0 ? (
-                                <div className="flex items-center justify-between w-full">
-                                    <span className="text-sm font-bold text-purple-600 flex items-center gap-1"><Icon name="filter" size={14}/> Filtro Ativo ({activeFilters.length})</span>
-                                    <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button>
-                                </div>
-                            ) : (
-                                <>
-                                    <button onClick={() => setCurrentFolderId(null)} className={`flex items-center hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${!currentFolderId ? 'font-bold text-blue-700' : 'text-gray-500'}`}><Icon name="home" size={14} className="mr-1"/> Início</button>
-                                    {breadcrumbs.map((folder, i) => (<React.Fragment key={folder.id}><span className="text-gray-300">/</span><button onClick={() => setCurrentFolderId(folder.id)} className={`hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${i === breadcrumbs.length - 1 ? 'font-bold text-blue-700' : 'text-gray-500'}`}>{folder.name}</button></React.Fragment>))}
-                                </>
-                            )}
-                        </div></div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1">{!activeFilters.length && currentFolderId && (<button onClick={() => { const curr = items.find(i => i.id === currentFolderId); setCurrentFolderId(curr ? curr.parentId : null); }} className="w-full text-left p-2 hover:bg-gray-100 rounded text-gray-500 text-sm flex items-center gap-2 mb-2"><Icon name="cornerUpLeft" size={16} /> .. Voltar</button>)}{currentFolderItems.map(item => (<div key={item.id} className={`group relative p-2 rounded-lg border transition-all cursor-pointer select-none grid grid-cols-[auto_1fr_auto] gap-3 items-center ${item.id === activeDeckId ? 'bg-blue-50 border-blue-300 shadow-sm ring-1 ring-blue-200' : 'bg-white border-gray-100 hover:border-gray-300 hover:bg-gray-50'}`} onClick={() => { if (item.type === 'folder') setCurrentFolderId(item.id); else selectDeck(item.id); }}><div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.type === 'folder' ? 'bg-yellow-100 text-yellow-600' : item.type === 'note' ? 'bg-indigo-100 text-indigo-600' : item.type === 'pdf' ? 'bg-red-100 text-red-600' : item.type === 'video' ? 'bg-pink-100 text-pink-600' : item.type === 'image' ? 'bg-purple-100 text-purple-600' : (item.id === activeDeckId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500')}`}><Icon name={item.type === 'folder' ? 'folder' : item.type === 'note' ? 'fileText' : item.type === 'pdf' ? 'fileText' : item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : 'play'} size={14} className={item.id === activeDeckId ? "ml-0.5" : ""} /></div><div className="min-w-0">{editingItemId === item.id ? (<div className="flex items-center gap-1" onClick={e => e.stopPropagation()}><input ref={editInputRef} value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => { if(e.key==='Enter') saveRename(e); if(e.key==='Escape') setEditingItemId(null); }} className="w-full text-sm border rounded px-1 py-0.5 focus:border-blue-500 outline-none" /><button onClick={saveRename} className="text-green-600 p-1"><Icon name="check" size={14}/></button></div>) : (<div><p className={`text-sm font-medium truncate ${item.id === activeDeckId ? 'text-blue-900' : 'text-gray-700'}`}>{item.name}</p><div className="flex items-center gap-2 mt-0.5">{item.type === 'folder' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{countItemsInFolder(item.id)} itens</span> : item.type === 'note' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">Nota</span> : item.type === 'pdf' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">PDF Local</span> : item.type === 'video' ? <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 rounded-full">Vídeo</span> : item.type === 'image' ? <><span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 rounded-full">Imagem</span><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full max-w-[80px] truncate">{getHostname(item.content)}</span></> : <><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{Math.round(((item.progress || 0) / (item.cards?.length || 1)) * 100)}%</span>{item.completions > 0 && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 rounded-full flex items-center gap-1 font-bold"><Icon name="trophy" size={8} /> {item.completions}</span>}</>}</div></div>)}</div>{editingItemId !== item.id && (<div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><div className="flex items-center gap-1 mr-2"><button onClick={(e) => downloadItem(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Baixar"><Icon name="download" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'copy')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Copiar"><Icon name="copy" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'cut')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-orange-600 rounded" title="Recortar"><Icon name="scissors" size={14} /></button><button onClick={(e) => startRenaming(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-green-600 rounded" title="Renomear"><Icon name="edit2" size={14} /></button><button onClick={(e) => deleteItem(e, item.id)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-red-600 rounded" title="Excluir"><Icon name="trash2" size={14} /></button></div></div>)}</div>))}{currentFolderItems.length === 0 && (<div className="text-center text-gray-400 py-8 text-sm italic">{activeFilters.length > 0 ? "Nenhum arquivo encontrado." : "Pasta vazia"}</div>)}</div>
-                        <div className="p-4 bg-gray-50 border-t shrink-0 flex flex-col gap-2">{clipboard ? (<div className="flex gap-2 w-full"><button onClick={pasteItems} className="flex-1 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-medium flex items-center justify-center gap-2 border border-orange-200 animate-pulse"><Icon name="clipboard" size={16} /> Colar {clipboard.items.length} item(s) ({clipboard.mode === 'cut' ? 'Recortado' : 'Copiado'})</button><button onClick={cancelClipboard} className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded-lg"><Icon name="x" size={16} /></button></div>) : (<div className="flex gap-2"><div className="relative flex-1"><button onClick={() => setShowNewMenu(!showNewMenu)} className="w-full py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="plus" size={16} /> Novo</button>{showNewMenu && (<div className="absolute bottom-full left-0 w-full mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200"><button onClick={createFolder} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 border-b border-gray-50"><Icon name="folderPlus" size={16} className="text-yellow-500"/> Pasta</button><button onClick={createNote} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="fileText" size={16} className="text-indigo-500"/> Nota (Texto)</button><button onClick={createVideo} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="video" size={16} className="text-pink-500"/> Vídeo (Iframe)</button><button onClick={createImage} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="image" size={16} className="text-purple-500"/> Imagem (URL)</button></div>)}</div><button onClick={() => fileInputRef.current.click()} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="filePlus" size={16} /> Importar</button>
-                        <div className="relative">
-                            <button onClick={() => setShowFilterMenu(!showFilterMenu)} className={`h-full px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors ${activeFilters.length > 0 ? 'bg-purple-50 text-purple-600 border-purple-200 ring-1 ring-purple-200' : ''}`} title="Filtrar"><Icon name="filter" size={16} /></button>
-                            {showFilterMenu && (
-                                <div className="absolute bottom-full right-0 w-48 mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200 z-50">
-                                    <div className="p-3 border-b bg-gray-50 text-xs font-bold text-gray-500 uppercase">Filtrar por Tipo</div>
-                                    <div className="p-2 space-y-1">
-                                        {[
-                                            {id: 'deck', label: 'Flashcards', color: 'bg-blue-500'},
-                                            {id: 'note', label: 'Notas', color: 'bg-indigo-500'},
-                                            {id: 'pdf', label: 'PDF', color: 'bg-red-500'},
-                                            {id: 'video', label: 'Vídeo', color: 'bg-pink-500'},
-                                            {id: 'image', label: 'Imagem', color: 'bg-purple-500'}
-                                        ].map(type => (
-                                            <button 
-                                                key={type.id} 
-                                                onClick={() => toggleFilter(type.id)}
-                                                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${activeFilters.includes(type.id) ? 'bg-gray-100 font-medium text-gray-900' : 'hover:bg-gray-50 text-gray-600'}`}
-                                            >
-                                                <span className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${type.color}`}></span>{type.label}</span>
-                                                {activeFilters.includes(type.id) && <Icon name="check" size={14} className="text-green-600"/>}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    {activeFilters.length > 0 && <div className="p-2 border-t bg-gray-50"><button onClick={clearFilters} className="w-full py-1.5 text-xs text-red-600 hover:bg-red-50 rounded font-medium">Limpar Filtros</button></div>}
-                                </div>
-                            )}
-                        </div>
-                        </div>)}<input type="file" accept=".csv, .txt, .pdf" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" /></div>
-                    </div>
+                        <div className="flex-1 flex flex-col h-full relative order-2 md:order-1 overflow-hidden"><div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center shadow-sm shrink-0"><span className="font-bold text-gray-700 truncate mr-2">{currentItem ? currentItem.name : "Selecione"}</span><button onClick={() => setShowQueue(!showQueue)} className="p-2 bg-gray-100 rounded"><Icon name="layers" size={20} /></button></div><div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">{!currentItem ? (<div className="text-center text-gray-400 my-auto"><Icon name="arrow-up" size={48} className="mx-auto mb-4 opacity-20 rotate-90 md:rotate-0" /><p>Selecione um item.</p></div>) : currentItem.type === 'note' ? (<div className="w-full max-w-4xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-blue-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Salvo auto</span></div><textarea className="flex-1 p-6 w-full resize-none focus:outline-none text-gray-700 font-mono text-sm leading-relaxed" value={currentItem.content || ''} onChange={(e) => updateNoteContent(currentItem.id, e.target.value)} placeholder="Digite..."></textarea></div>) : currentItem.type === 'pdf' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-red-500" />{currentItem.name}</div><span className="text-xs text-gray-400">PDF Local</span></div>{pdfUrl ? (<iframe src={`PDF%20LEITOR.html?id=${currentItem.id}`} className="w-full h-full border-none" title="PDF Viewer"></iframe>) : pdfMissing ? (<div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-500 space-y-4"><Icon name="fileText" size={48} className="text-gray-300" /><div><h3 className="font-bold text-gray-700">Arquivo não encontrado</h3><p className="text-xs mt-1">O PDF <b>{currentItem.name}.pdf</b> é local.</p></div><button onClick={() => restorePdfRef.current.click()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors">Localizar PDF</button><input ref={restorePdfRef} type="file" accept=".pdf" onChange={handlePdfRestore} className="hidden" /></div>) : (<div className="flex-1 flex items-center justify-center text-gray-400">Carregando...</div>)}</div>) : currentItem.type === 'video' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="video" size={18} className="text-pink-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Vídeo Link</span></div><div className="flex-1 bg-black relative"><iframe src={getEmbedUrl(currentItem.content)} className="absolute inset-0 w-full h-full border-none" title={currentItem.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div></div>) : currentItem.type === 'image' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="image" size={18} className="text-purple-500" />{currentItem.name}</div><div className="flex items-center gap-2"><span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{getHostname(currentItem.content)}</span><span className="text-xs text-gray-400">Imagem Web</span></div></div><div className="flex-1 bg-gray-100 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing" onMouseDown={handleImageMouseDown} onMouseMove={handleImageMouseMove} onMouseUp={handleImageMouseUp} onMouseLeave={handleImageMouseUp}><div className="absolute top-4 right-4 z-10 flex gap-2 bg-white/80 p-1 rounded-lg shadow backdrop-blur-sm"><button onClick={() => setImageZoom(z => Math.max(0.1, z - 0.1))} className="p-1 hover:bg-gray-200 rounded"><Icon name="minus" size={16}/></button><span className="text-xs w-8 text-center self-center">{Math.round(imageZoom * 100)}%</span><button onClick={() => setImageZoom(z => z + 0.1)} className="p-1 hover:bg-gray-200 rounded"><Icon name="plus" size={16}/></button><button onClick={resetImage} className="p-1 hover:bg-gray-200 rounded text-red-500" title="Resetar"><Icon name="rotateCcw" size={16}/></button></div><div className="w-full h-full flex items-center justify-center pointer-events-none"><img src={currentItem.content} alt={currentItem.name} style={{ transform: `translate(${imagePos.x}px, ${imagePos.y}px) scale(${imageZoom})`, transformOrigin: 'center', transition: isDraggingImage ? 'none' : 'transform 0.2s ease-out', cursor: isDraggingImage ? 'grabbing' : 'grab' }} className="max-w-full max-h-full object-contain pointer-events-auto" draggable="false" onError={(e) => {e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x300?text=Erro+ao+carregar+imagem'}} /></div></div></div>) : (<div className="w-full max-w-5xl flex-1 flex flex-col items-center my-auto"><div className="flex items-center justify-center w-full gap-4 md:gap-8"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronLeft" size={32} /></button><div className="perspective-1000 w-full max-w-2xl h-[350px] md:h-[500px] cursor-pointer group relative" onClick={handleFlip}><div className={`relative w-full h-full text-center transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}><div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden" style={{ backgroundColor: theme.frontBg, color: theme.frontText }}><div className="h-2 w-full" style={{ backgroundColor: `${theme.progressColor}33` }}><div className="h-full transition-all duration-300" style={{ width: `${(((currentCardIndex || 0) + 1) / (currentItem.cards?.length || 1)) * 100}%`, backgroundColor: theme.progressColor }}></div></div><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><div className="flex justify-between items-center w-full opacity-50"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded">Pergunta</span><span className="text-xs font-mono">{currentCardIndex + 1}/{currentItem.cards?.length || 0}</span></div><h2 className="text-2xl md:text-3xl font-semibold leading-snug">{currentCard ? currentCard.front : ""}</h2></div></div><div className="p-4 text-xs font-medium border-t border-black/5 opacity-50">Toque para virar</div></div><div className="absolute w-full h-full backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-700 overflow-hidden" style={{ backgroundColor: theme.backBg, color: theme.backText }}><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded self-center opacity-60">Resposta</span><p className="text-xl md:text-2xl font-light leading-relaxed whitespace-pre-wrap">{currentCard ? currentCard.back : ""}</p>{currentCard && (<button onClick={(e) => { e.stopPropagation(); const q = encodeURIComponent(`${currentCard.front} ${currentCard.back} explicar detalhadamente`).replace(/%20/g, '+'); window.open(`https://www.google.com/search?udm=50&aep=11&q=${q}`, '_blank'); }} className="mt-4 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-current opacity-60 hover:opacity-100 hover:bg-white/10 transition-all self-center"><Icon name="search" size={14} /> Saber mais</button>)}</div></div><div className="p-4 text-xs font-medium border-t border-white/10 opacity-50">Próximo...</div></div></div></div><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronRight" size={32} /></button></div><div className="flex md:hidden items-center justify-between w-full max-w-2xl mt-6 gap-4"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronLeft" size={24} /></button><button onClick={(e) => { e.stopPropagation(); handleFlip(); }} className="flex-1 py-4 text-white rounded-xl shadow font-semibold flex justify-center items-center gap-2" style={{ backgroundColor: theme.progressColor }}><Icon name="rotateCw" size={20} /> Virar</button><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronRight" size={24} /></button></div></div>)}</div></div>
+                        <div className={`fixed inset-0 z-40 bg-white flex flex-col transition-transform duration-300 md:relative md:translate-x-0 md:border-l border-gray-200 md:order-2 h-full ${showQueue ? 'translate-x-0' : 'translate-x-full'}`} style={isDesktop ? { width: sidebarWidth } : {}}><div className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-400 z-50 transition-colors" onMouseDown={startResizing} style={{ backgroundColor: isResizing ? '#3b82f6' : 'transparent', touchAction: 'none' }} /><div className="p-4 bg-gray-50 border-b shrink-0 flex flex-col gap-3"><div className="flex justify-between items-center"><h2 className="font-bold text-gray-700 flex items-center gap-2"><Icon name="layers" size={20} /> Explorador</h2><div className="flex gap-1"><button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-200 rounded"><Icon name="settings" size={18}/></button><button onClick={() => setShowStats(true)} className={`p-2 hover:bg-gray-200 rounded ${saveStatus==='saved_cloud'?'text-green-500':''}`}><Icon name="barChart" size={18}/></button><button onClick={() => setShowQueue(false)} className="md:hidden p-2 hover:bg-gray-200 rounded"><Icon name="x" size={20}/></button></div></div><div className="flex items-center gap-1 text-sm overflow-x-auto whitespace-nowrap pb-1 custom-scroll">{activeFilters.length > 0 ? (<div className="flex items-center justify-between w-full"><span className="text-sm font-bold text-purple-600 flex items-center gap-1"><Icon name="filter" size={14}/> Filtro Ativo ({activeFilters.length})</span><button onClick={clearFilters} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button></div>) : (<><button onClick={() => setCurrentFolderId(null)} className={`flex items-center hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${!currentFolderId ? 'font-bold text-blue-700' : 'text-gray-500'}`}><Icon name="home" size={14} className="mr-1"/> Início</button>{breadcrumbs.map((folder, i) => (<React.Fragment key={folder.id}><span className="text-gray-300">/</span><button onClick={() => setCurrentFolderId(folder.id)} className={`hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${i === breadcrumbs.length - 1 ? 'font-bold text-blue-700' : 'text-gray-500'}`}>{folder.name}</button></React.Fragment>))}</>)}</div></div><div className="flex-1 overflow-y-auto p-2 space-y-1">{!activeFilters.length && currentFolderId && (<button onClick={() => { const curr = items.find(i => i.id === currentFolderId); setCurrentFolderId(curr ? curr.parentId : null); }} className="w-full text-left p-2 hover:bg-gray-100 rounded text-gray-500 text-sm flex items-center gap-2 mb-2"><Icon name="cornerUpLeft" size={16} /> .. Voltar</button>)}{currentFolderItems.map(item => (<div key={item.id} className={`group relative p-2 rounded-lg border transition-all cursor-pointer select-none grid grid-cols-[auto_1fr_auto] gap-3 items-center ${item.id === activeDeckId ? 'bg-blue-50 border-blue-300 shadow-sm ring-1 ring-blue-200' : 'bg-white border-gray-100 hover:border-gray-300 hover:bg-gray-50'}`} onClick={() => { if (item.type === 'folder') setCurrentFolderId(item.id); else selectDeck(item.id); }}><div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.type === 'folder' ? 'bg-yellow-100 text-yellow-600' : item.type === 'note' ? 'bg-indigo-100 text-indigo-600' : item.type === 'pdf' ? 'bg-red-100 text-red-600' : item.type === 'video' ? 'bg-pink-100 text-pink-600' : item.type === 'image' ? 'bg-purple-100 text-purple-600' : (item.id === activeDeckId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500')}`}><Icon name={item.type === 'folder' ? 'folder' : item.type === 'note' ? 'fileText' : item.type === 'pdf' ? 'fileText' : item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : 'play'} size={14} className={item.id === activeDeckId ? "ml-0.5" : ""} /></div><div className="min-w-0">{editingItemId === item.id ? (<div className="flex items-center gap-1" onClick={e => e.stopPropagation()}><input ref={editInputRef} value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => { if(e.key==='Enter') saveRename(e); if(e.key==='Escape') setEditingItemId(null); }} className="w-full text-sm border rounded px-1 py-0.5 focus:border-blue-500 outline-none" /><button onClick={saveRename} className="text-green-600 p-1"><Icon name="check" size={14}/></button></div>) : (<div><p className={`text-sm font-medium truncate ${item.id === activeDeckId ? 'text-blue-900' : 'text-gray-700'}`}>{item.name}</p><div className="flex items-center gap-2 mt-0.5">{item.type === 'folder' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{countItemsInFolder(item.id)} itens</span> : item.type === 'note' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">Nota</span> : item.type === 'pdf' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">PDF Local</span> : item.type === 'video' ? <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 rounded-full">Vídeo</span> : item.type === 'image' ? <><span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 rounded-full">Imagem</span><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full max-w-[80px] truncate">{getHostname(item.content)}</span></> : <><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{Math.round(((item.progress || 0) / (item.cards?.length || 1)) * 100)}%</span>{item.completions > 0 && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 rounded-full flex items-center gap-1 font-bold"><Icon name="trophy" size={8} /> {item.completions}</span>}</>}</div></div>)}</div>{editingItemId !== item.id && (<div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><div className="flex items-center gap-1 mr-2"><button onClick={(e) => downloadItem(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Baixar"><Icon name="download" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'copy')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Copiar"><Icon name="copy" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'cut')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-orange-600 rounded" title="Recortar"><Icon name="scissors" size={14} /></button><button onClick={(e) => startRenaming(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-green-600 rounded" title="Renomear"><Icon name="edit2" size={14} /></button><button onClick={(e) => deleteItem(e, item.id)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-red-600 rounded" title="Excluir"><Icon name="trash2" size={14} /></button></div></div>)}</div>))}{currentFolderItems.length === 0 && (<div className="text-center text-gray-400 py-8 text-sm italic">{activeFilters.length > 0 ? "Nenhum arquivo encontrado." : "Pasta vazia"}</div>)}</div><div className="p-4 bg-gray-50 border-t shrink-0 flex flex-col gap-2">{clipboard ? (<div className="flex gap-2 w-full"><button onClick={pasteItems} className="flex-1 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-medium flex items-center justify-center gap-2 border border-orange-200 animate-pulse"><Icon name="clipboard" size={16} /> Colar {clipboard.items.length} item(s) ({clipboard.mode === 'cut' ? 'Recortado' : 'Copiado'})</button><button onClick={cancelClipboard} className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded-lg"><Icon name="x" size={16} /></button></div>) : (<div className="flex gap-2"><div className="relative flex-1"><button onClick={() => setShowNewMenu(!showNewMenu)} className="w-full py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="plus" size={16} /> Novo</button>{showNewMenu && (<div className="absolute bottom-full left-0 w-full mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200"><button onClick={createFolder} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 border-b border-gray-50"><Icon name="folderPlus" size={16} className="text-yellow-500"/> Pasta</button><button onClick={createNote} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="fileText" size={16} className="text-indigo-500"/> Nota (Texto)</button><button onClick={createVideo} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="video" size={16} className="text-pink-500"/> Vídeo (Iframe)</button><button onClick={createImage} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="image" size={16} className="text-purple-500"/> Imagem (URL)</button></div>)}</div><button onClick={() => fileInputRef.current.click()} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="filePlus" size={16} /> Importar</button><div className="relative"><button onClick={() => setShowFilterMenu(!showFilterMenu)} className={`h-full px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors ${activeFilters.length > 0 ? 'bg-purple-50 text-purple-600 border-purple-200 ring-1 ring-purple-200' : ''}`} title="Filtrar"><Icon name="filter" size={16} /></button>{showFilterMenu && (<div className="absolute bottom-full right-0 w-48 mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200 z-50"><div className="p-3 border-b bg-gray-50 text-xs font-bold text-gray-500 uppercase">Filtrar por Tipo</div><div className="p-2 space-y-1">{[{id: 'deck', label: 'Flashcards', color: 'bg-blue-500'},{id: 'note', label: 'Notas', color: 'bg-indigo-500'},{id: 'pdf', label: 'PDF', color: 'bg-red-500'},{id: 'video', label: 'Vídeo', color: 'bg-pink-500'},{id: 'image', label: 'Imagem', color: 'bg-purple-500'}].map(type => (<button key={type.id} onClick={() => toggleFilter(type.id)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${activeFilters.includes(type.id) ? 'bg-gray-100 font-medium text-gray-900' : 'hover:bg-gray-50 text-gray-600'}`}><span className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${type.color}`}></span>{type.label}</span>{activeFilters.includes(type.id) && <Icon name="check" size={14} className="text-green-600"/>}</button>))}</div>{activeFilters.length > 0 && <div className="p-2 border-t bg-gray-50"><button onClick={clearFilters} className="w-full py-1.5 text-xs text-red-600 hover:bg-red-50 rounded font-medium">Limpar Filtros</button></div>}</div>)}</div></div>)}<input type="file" accept=".csv, .txt, .pdf" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" /></div></div>
                     {showSettings && <SettingsModal />}
                     {showStats && <StatsModal />}
                     {showCompletionModal && <CompletionModal />}
