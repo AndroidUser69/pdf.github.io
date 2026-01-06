@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flashcard Flow - Cloud Pro v2.0.7</title>
+    <title>Flashcard Flow - Cloud Pro v2.1.1</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -59,13 +59,31 @@
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
         // --- CONSTANTES ---
-        const APP_VERSION = "2.0.7";
+        const APP_VERSION = "2.1.1";
         const FIREBASE_CONFIG_FIXED = { apiKey: "AIzaSyApOjZZ75TyDD126CyN4kF7dVeoMvAo5dk", authDomain: "estudos-ec4c5.firebaseapp.com", projectId: "estudos-ec4c5", storageBucket: "estudos-ec4c5.firebasestorage.app", messagingSenderId: "152433763794", appId: "1:152433763794:web:31b8b3fc2f2ee7ae4ed40b", measurementId: "G-YVK8REQRF8" };
         const DEFAULT_THEME = { frontBg: '#ffffff', frontText: '#1f2937', backBg: '#0f172a', backText: '#e2e8f0', progressColor: '#3b82f6', headerBg: '#ffffff' };
         
         const THEME_KEY_PREFIX = 'flashcardFlowTheme_v1_';
         const getStorageKey = (u) => `flashcardFlowData_v13_${u ? u.uid : 'guest'}`;
         const getThemeKey = (u) => `${THEME_KEY_PREFIX}${u ? u.uid : 'guest'}`;
+        
+        const DEFAULT_EDITAL_JSON = JSON.stringify({
+          "id": "edital_exemplo",
+          "disciplinas": [
+            {
+              "id": "exemplo_disciplina",
+              "titulo": "Exemplo de Disciplina",
+              "itens": [
+                {
+                  "path": "1",
+                  "titulo": "Tópico de Exemplo",
+                  "aula": "Aula 01",
+                  "descricao": "Descrição do tópico."
+                }
+              ]
+            }
+          ]
+        }, null, 2);
 
         // --- HELPER SEGURO PARA LOCALSTORAGE ---
         const safeLocalStorage = {
@@ -154,7 +172,7 @@
                 clipboard: <g><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></g>,
                 moreVertical: <g><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></g>,
                 cornerUpLeft: <g><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></g>,
-                home: <g><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></g>,
+                home: <g><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 12 15 22"/></g>,
                 plus: <g><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></g>,
                 fileText: <g><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></g>,
                 cloud: <g><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></g>,
@@ -168,7 +186,9 @@
                 pdf: <g><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></g>,
                 video: <g><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></g>,
                 image: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></g>,
-                filter: <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                filter: <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>,
+                fileJson: <g><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12a1 1 0 0 0-1 1v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-1-1z"/></g>,
+                list: <g><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></g>
             };
             const key = Object.keys(paths).find(k => k.toLowerCase() === name.replace(/-/g, '').toLowerCase());
             return <svg {...props}>{paths[key] || <circle cx="12" cy="12" r="10"/>}</svg>;
@@ -253,6 +273,9 @@
             const [pdfUrl, setPdfUrl] = useState(null);
             const [pdfMissing, setPdfMissing] = useState(false);
             const [imageZoom, setImageZoom] = useState(1);
+            
+            // --- Novos Estados (Edital/Busca) ---
+            const [searchTerm, setSearchTerm] = useState("");
             
             // --- Estados para Pan ---
             const [imagePos, setImagePos] = useState({ x: 0, y: 0 });
@@ -453,10 +476,109 @@
 
             // ... (useMemo currentItem, currentCard, currentFolderItems etc. - same as before) ...
             const currentItem = useMemo(() => items.find(i => i.id === activeDeckId), [items, activeDeckId]);
+
+            // --- CORREÇÃO DO BUG DE PROGRESSO (MANTIDA) ---
+            useEffect(() => {
+                if (currentItem && currentItem.type === 'deck') {
+                    const savedIndex = Number(currentItem.progress) || 0;
+                    const maxLen = currentItem.cards ? currentItem.cards.length : 0;
+                    if (savedIndex >= maxLen && maxLen > 0) {
+                        setCurrentCardIndex(maxLen - 1);
+                    } else {
+                        setCurrentCardIndex(savedIndex);
+                    }
+                } else if (!currentItem || currentItem.id !== activeDeckId) {
+                    setCurrentCardIndex(0);
+                }
+            }, [currentItem]);
+            // ----------------------------------------------------
+
             useEffect(() => { setImageZoom(1); setImagePos({ x: 0, y: 0 }); }, [activeDeckId]);
             const currentCard = useMemo(() => (currentItem && Array.isArray(currentItem.cards)) ? currentItem.cards[currentCardIndex] : null, [currentItem, currentCardIndex]);
+            
+            // --- LÓGICA DE FILTRAGEM E BUSCA INTELIGENTE DO EXPLORER ---
             const currentFolderItems = useMemo(() => {
                 if (!items) return [];
+
+                // 1. Se houver um termo de busca
+                if (searchTerm && searchTerm.trim() !== '') {
+                    const term = searchTerm.toLowerCase();
+                    
+                    // -- BUSCA CONTEXTUAL (ESCOPO) --
+                    // Se estivermos dentro de uma pasta (ex: ao clicar no Edital),
+                    // limitamos a busca a essa pasta e subpastas.
+                    let targetScopeItems = items;
+                    if (currentFolderId) {
+                        // Função recursiva para pegar todos os IDs de subpastas e a pasta atual
+                        const getDescendantIds = (rootId) => {
+                            let ids = [rootId];
+                            const children = items.filter(i => i.type === 'folder' && i.parentId === rootId);
+                            children.forEach(c => {
+                                ids = ids.concat(getDescendantIds(c.id));
+                            });
+                            return ids;
+                        };
+                        const allowedParentIds = getDescendantIds(currentFolderId);
+                        // Filtra itens cujo parentId esteja na lista de permitidos
+                        targetScopeItems = items.filter(i => allowedParentIds.includes(i.parentId));
+                    }
+
+                    // -- Lógica Avançada de Busca de Aulas (Mantida) --
+                    const isLessonSearch = term.includes('aula');
+                    let targetLessons = [];
+
+                    if (isLessonSearch) {
+                        const rangeRegex = /(\d+)\s*(?:-|a|à|at[eé])\s*(?:aula\s*)?(\d+)/gi;
+                        let match;
+                        const rangeRegexInstance = new RegExp(rangeRegex);
+                        while ((match = rangeRegexInstance.exec(term)) !== null) {
+                            const start = parseInt(match[1]);
+                            const end = parseInt(match[2]);
+                            if (!isNaN(start) && !isNaN(end)) {
+                                for (let i = Math.min(start, end); i <= Math.max(start, end); i++) {
+                                    targetLessons.push(i);
+                                }
+                            }
+                        }
+                        const allNumbers = term.match(/\d+/g);
+                        if (allNumbers) {
+                            allNumbers.forEach(n => targetLessons.push(parseInt(n)));
+                        }
+                        targetLessons = [...new Set(targetLessons)];
+                    }
+
+                    // Aplica o filtro de texto nos itens do escopo
+                    return targetScopeItems.filter(i => {
+                        const iName = i.name.toLowerCase();
+                        const iContent = (i.content && typeof i.content === 'string') ? i.content.toLowerCase() : "";
+                        
+                        if (isLessonSearch && targetLessons.length > 0) {
+                            if (!iName.includes('aula') && !iContent.includes('aula')) return false;
+                            return targetLessons.some(num => {
+                                const lessonRegex = new RegExp(`aula[s]?\\s*:?\\s*0*${num}\\b`, 'i');
+                                return lessonRegex.test(iName) || lessonRegex.test(iContent);
+                            });
+                        }
+
+                        const nameMatch = iName.includes(term);
+                        const contentMatch = iContent.includes(term);
+                        return nameMatch || contentMatch;
+                    }).sort((a, b) => {
+                         // Ordenação: Edital > Pasta > Resto
+                         if (a.type === 'edital' && b.type !== 'edital') return -1;
+                         if (a.type !== 'edital' && b.type === 'edital') return 1;
+                         if (a.type === 'folder' && b.type !== 'folder') return -1;
+                         if (a.type !== 'folder' && b.type === 'folder') return 1;
+                         
+                         const aName = a.name.toLowerCase().includes(term);
+                         const bName = b.name.toLowerCase().includes(term);
+                         if (aName && !bName) return -1;
+                         if (!aName && bName) return 1;
+                         return 0;
+                    });
+                }
+
+                // 2. Filtro normal por tipo (botões de filtro)
                 if (activeFilters.length > 0) {
                     let targetItems = items;
                     if (currentFolderId !== null) {
@@ -464,13 +586,28 @@
                         const allowedParentIds = getSubfolderIds(currentFolderId);
                         targetItems = items.filter(i => allowedParentIds.includes(i.parentId));
                     }
-                    return targetItems.filter(i => activeFilters.includes(i.type)).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+                    return targetItems.filter(i => activeFilters.includes(i.type)).sort((a, b) => {
+                        // Ordenação: Edital > Pasta > Resto
+                        if (a.type === 'edital' && b.type !== 'edital') return -1;
+                        if (a.type !== 'edital' && b.type === 'edital') return 1;
+                        if (a.type === 'folder' && b.type !== 'folder') return -1;
+                        if (a.type !== 'folder' && b.type === 'folder') return 1;
+                        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+                    });
                 }
+
+                // 3. Navegação normal por pasta
                 return items.filter(i => i.parentId === currentFolderId).sort((a,b) => {
-                    if (a.type === b.type) return a.name.localeCompare(b.name, undefined, {sensitivity: 'base', numeric: true});
-                    return a.type === 'folder' ? -1 : 1;
+                    // NOVA ORDENAÇÃO: Edital > Pasta > Resto
+                    if (a.type === 'edital' && b.type !== 'edital') return -1;
+                    if (a.type !== 'edital' && b.type === 'edital') return 1;
+                    if (a.type === 'folder' && b.type !== 'folder') return -1;
+                    if (a.type !== 'folder' && b.type === 'folder') return 1;
+                    // Se forem do mesmo "grupo" de prioridade, ordena alfabeticamente
+                    return a.name.localeCompare(b.name, undefined, {sensitivity: 'base', numeric: true});
                 });
-            }, [items, currentFolderId, activeFilters]);
+            }, [items, currentFolderId, activeFilters, searchTerm]); // Adicionado searchTerm nas dependências
+
             const breadcrumbs = useMemo(() => { const p=[]; let c=currentFolderId; while(c){const f=items.find(i=>i.id===c); if(f){p.unshift(f); c=f.parentId}else break;} return p; }, [items, currentFolderId]);
             const withCloud = (newItems) => { setItems(newItems); saveToCloud(newItems, theme); };
 
@@ -479,8 +616,27 @@
             const createNote = () => { const name = prompt("Nome:"); if(!name) return; const note = {id: Date.now().toString()+Math.random(), type:'note', name, parentId: currentFolderId, content:''}; withCloud([...items, note]); setActiveDeckId(note.id); setShowNewMenu(false); };
             const createVideo = () => { const name = prompt("Nome do Vídeo:"); if(!name) return; const url = prompt("Link do Vídeo (URL):"); if(!url) return; const video = {id: Date.now().toString()+Math.random(), type:'video', name, parentId: currentFolderId, content:url}; withCloud([...items, video]); setActiveDeckId(video.id); setShowNewMenu(false); };
             const createImage = () => { const name = prompt("Nome da Imagem:"); if(!name) return; const url = prompt("Link da Imagem (URL):"); if(!url) return; const image = {id: Date.now().toString()+Math.random(), type:'image', name, parentId: currentFolderId, content:url}; withCloud([...items, image]); setActiveDeckId(image.id); setShowNewMenu(false); };
+            
+            // --- NOVO CRIADOR DE EDITAL ---
+            const createEdital = () => {
+                const name = prompt("Nome do Edital:");
+                if (!name) return;
+                const edital = {
+                    id: Date.now().toString() + Math.random(),
+                    type: 'edital',
+                    name: name,
+                    parentId: currentFolderId,
+                    content: DEFAULT_EDITAL_JSON,
+                    progressMap: {}
+                };
+                withCloud([...items, edital]);
+                setActiveDeckId(edital.id);
+                setShowNewMenu(false);
+            };
+
             const toggleFilter = (type) => { setActiveFilters(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]); };
-            const clearFilters = () => { setActiveFilters([]); setShowFilterMenu(false); };
+            const clearFilters = () => { setActiveFilters([]); setShowFilterMenu(false); setSearchTerm(""); }; // Limpa busca ao limpar filtros
+            const clearSearch = () => { setSearchTerm(""); };
 
             // ... (handleFileUpload, handlePdfRestore, updateDeckProgress, updateNoteContent, handleFlip, handleNext, handlePrev, deleteItem, saveRename, pasteItems, startRenaming, addToClipboard, cancelClipboard) ...
             const handleFileUpload = async (e) => { const files = Array.from(e.target.files); if(files.length===0) return; const toAdd = []; for(let f of files) { try { const id = Date.now().toString() + Math.random(); if(f.name.endsWith('.pdf')) { await dbHelper.saveFile(id, f); toAdd.push({id, type:'pdf', name:f.name.replace('.pdf',''), parentId:currentFolderId}); } else if(f.name.endsWith('.txt')) { const txt = await readFileAsText(f); toAdd.push({id, type:'note', name:f.name.replace('.txt',''), parentId:currentFolderId, content:txt}); } else { const txt = await readFileAsText(f); const c = parseCSV(txt); if(c.length>0) toAdd.push({id, type:'deck', name:f.name.replace('.csv',''), parentId:currentFolderId, cards:c, progress:0, completions:0}); } } catch(err){ console.error(err); } } if(toAdd.length>0) withCloud([...items, ...toAdd]); e.target.value=''; };
@@ -488,6 +644,38 @@
             useEffect(() => { if (currentItem?.type === 'pdf') { setPdfMissing(false); dbHelper.getFile(currentItem.id).then(blob => { if (blob) { const url = URL.createObjectURL(blob); setPdfUrl(url); } else { setPdfUrl(null); setPdfMissing(true); } }); } else { if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); } setPdfMissing(false); } }, [activeDeckId, currentItem]);
             const updateDeckProgress = (id, idx) => setItems(p => p.map(i => i.id===id ? {...i, progress:idx} : i));
             const updateNoteContent = (id, c) => setItems(p => p.map(i => i.id===id ? {...i, content:c} : i));
+            
+            // --- UPDATES DO EDITAL ---
+            const updateEditalContent = (id, c) => setItems(p => p.map(i => i.id===id ? {...i, content:c} : i));
+            const updateEditalProgress = (id, discId, path, checked) => {
+                setItems(prevItems => prevItems.map(item => {
+                    if (item.id === id) {
+                        const newMap = { ...(item.progressMap || {}) };
+                        if (!newMap[discId]) newMap[discId] = {};
+                        newMap[discId][path] = checked;
+                        return { ...item, progressMap: newMap };
+                    }
+                    return item;
+                }));
+            };
+            
+            // --- BUSCA INTELIGENTE (LINK DO EDITAL) ---
+            const handleSmartSearch = (disciplineTitle, aulaTitle) => {
+                // 1. Define o escopo como a pasta onde o edital está
+                // Se o edital está na raiz (parentId null), busca na raiz (global).
+                // Se está numa pasta, busca apenas nela e subpastas.
+                setCurrentFolderId(currentItem.parentId);
+
+                // 2. Define o termo de busca
+                setSearchTerm(aulaTitle);
+                
+                // 3. Feedback visual
+                showToast('success', `Buscando: ${aulaTitle}`);
+                
+                // Em telas pequenas, abre a sidebar
+                if (!isDesktop) setShowQueue(true);
+            };
+
             const handleFlip = () => setIsFlipped(!isFlipped);
             const handleNext = () => { if(currentCardIndex < (currentItem.cards?.length || 0) -1){ const n=currentCardIndex+1; setIsFlipped(false); setTimeout(()=>{setCurrentCardIndex(n); updateDeckProgress(activeDeckId, n)},150); } else setShowCompletionModal(true); };
             const handlePrev = () => { if(currentCardIndex > 0){ const n=currentCardIndex-1; setIsFlipped(false); setTimeout(()=>{setCurrentCardIndex(n); updateDeckProgress(activeDeckId, n)},150); } };
@@ -498,19 +686,16 @@
             const addToClipboard = (e, item, mode) => { e.stopPropagation(); setClipboard({ mode, items: [item.id] }); };
             const cancelClipboard = () => setClipboard(null);
             
-            useEffect(() => { const h = (e) => { if(!activeDeckId || showSettings || showStats || showCompletionModal || editingItemId) return; if(currentItem?.type==='note' || currentItem?.type==='pdf') return; if(e.code==='Space'){e.preventDefault(); handleFlip()} else if(e.code==='ArrowRight') handleNext(); else if(e.code==='ArrowLeft') handlePrev(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [activeDeckId, currentCardIndex, isFlipped, showSettings, showStats, showCompletionModal, editingItemId, currentItem]);
+            useEffect(() => { const h = (e) => { if(!activeDeckId || showSettings || showStats || showCompletionModal || editingItemId) return; if(currentItem?.type==='note' || currentItem?.type==='pdf' || currentItem?.type==='edital') return; if(e.code==='Space'){e.preventDefault(); handleFlip()} else if(e.code==='ArrowRight') handleNext(); else if(e.code==='ArrowLeft') handlePrev(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [activeDeckId, currentCardIndex, isFlipped, showSettings, showStats, showCompletionModal, editingItemId, currentItem]);
 
             const selectDeck = (id) => { if (editingItemId) return; setActiveDeckId(id); setIsFlipped(false); };
             const finishDeckTransition = (completed) => { setShowCompletionModal(false); const compl = completed ? (currentItem.completions||0)+1 : (currentItem.completions||0); const nextItems = items.map(i => i.id===activeDeckId ? {...i, progress:0, completions: compl} : i); if(completed) saveToCloud(nextItems, theme); setItems(nextItems); setIsFlipped(false); setTimeout(() => { const sibs = items.filter(i => i.parentId === currentItem.parentId && i.type === 'deck').sort((a,b)=>a.name.localeCompare(b.name)); const idx = sibs.findIndex(i=>i.id===activeDeckId); if(idx!==-1 && idx < sibs.length-1) setActiveDeckId(sibs[idx+1].id); else if(sibs.length>0) { setActiveDeckId(sibs[0].id); setCurrentCardIndex(0); } }, 150); };
 
-            // --- FUNÇÃO DE LOGOUT CORRIGIDA ---
             const handleLogout = () => {
-                // 1. Limpa o estado local
                 setUser(null);
                 setIsGuest(false);
                 setShowStats(false);
-                setItems([]); // Limpa a tela para forçar AuthScreen
-                // 2. Tenta logout no Firebase se disponível
+                setItems([]); 
                 if (window.firebaseAppObj && window.firebaseAppObj.auth) {
                     window.firebaseAppObj.signOut(window.firebaseAppObj.auth).catch(() => {});
                 }
@@ -584,8 +769,86 @@
                     <div className="h-screen w-full flex flex-col md:flex-row bg-gray-50 overflow-hidden">
                         {/* ... (Main Content & Sidebar - mantidos iguais) ... */}
                         {connectionLog && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg text-sm font-bold z-50 transition-all ${connectionLog.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{connectionLog.msg}</div>}
-                        <div className="flex-1 flex flex-col h-full relative order-2 md:order-1 overflow-hidden"><div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center shadow-sm shrink-0"><span className="font-bold text-gray-700 truncate mr-2">{currentItem ? currentItem.name : "Selecione"}</span><button onClick={() => setShowQueue(!showQueue)} className="p-2 bg-gray-100 rounded"><Icon name="layers" size={20} /></button></div><div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">{!currentItem ? (<div className="text-center text-gray-400 my-auto"><Icon name="arrow-up" size={48} className="mx-auto mb-4 opacity-20 rotate-90 md:rotate-0" /><p>Selecione um item.</p></div>) : currentItem.type === 'note' ? (<div className="w-full max-w-4xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-blue-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Salvo auto</span></div><textarea className="flex-1 p-6 w-full resize-none focus:outline-none text-gray-700 font-mono text-sm leading-relaxed" value={currentItem.content || ''} onChange={(e) => updateNoteContent(currentItem.id, e.target.value)} placeholder="Digite..."></textarea></div>) : currentItem.type === 'pdf' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-red-500" />{currentItem.name}</div><span className="text-xs text-gray-400">PDF Local</span></div>{pdfUrl ? (<iframe src={`PDF%20LEITOR.html?id=${currentItem.id}`} className="w-full h-full border-none" title="PDF Viewer"></iframe>) : pdfMissing ? (<div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-500 space-y-4"><Icon name="fileText" size={48} className="text-gray-300" /><div><h3 className="font-bold text-gray-700">Arquivo não encontrado</h3><p className="text-xs mt-1">O PDF <b>{currentItem.name}.pdf</b> é local.</p></div><button onClick={() => restorePdfRef.current.click()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors">Localizar PDF</button><input ref={restorePdfRef} type="file" accept=".pdf" onChange={handlePdfRestore} className="hidden" /></div>) : (<div className="flex-1 flex items-center justify-center text-gray-400">Carregando...</div>)}</div>) : currentItem.type === 'video' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="video" size={18} className="text-pink-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Vídeo Link</span></div><div className="flex-1 bg-black relative"><iframe src={getEmbedUrl(currentItem.content)} className="absolute inset-0 w-full h-full border-none" title={currentItem.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div></div>) : currentItem.type === 'image' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="image" size={18} className="text-purple-500" />{currentItem.name}</div><div className="flex items-center gap-2"><span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{getHostname(currentItem.content)}</span><span className="text-xs text-gray-400">Imagem Web</span></div></div><div className="flex-1 bg-gray-100 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing" onMouseDown={handleImageMouseDown} onMouseMove={handleImageMouseMove} onMouseUp={handleImageMouseUp} onMouseLeave={handleImageMouseUp}><div className="absolute top-4 right-4 z-10 flex gap-2 bg-white/80 p-1 rounded-lg shadow backdrop-blur-sm"><button onClick={() => setImageZoom(z => Math.max(0.1, z - 0.1))} className="p-1 hover:bg-gray-200 rounded"><Icon name="minus" size={16}/></button><span className="text-xs w-8 text-center self-center">{Math.round(imageZoom * 100)}%</span><button onClick={() => setImageZoom(z => z + 0.1)} className="p-1 hover:bg-gray-200 rounded"><Icon name="plus" size={16}/></button><button onClick={resetImage} className="p-1 hover:bg-gray-200 rounded text-red-500" title="Resetar"><Icon name="rotateCcw" size={16}/></button></div><div className="w-full h-full flex items-center justify-center pointer-events-none"><img src={currentItem.content} alt={currentItem.name} style={{ transform: `translate(${imagePos.x}px, ${imagePos.y}px) scale(${imageZoom})`, transformOrigin: 'center', transition: isDraggingImage ? 'none' : 'transform 0.2s ease-out', cursor: isDraggingImage ? 'grabbing' : 'grab' }} className="max-w-full max-h-full object-contain pointer-events-auto" draggable="false" onError={(e) => {e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x300?text=Erro+ao+carregar+imagem'}} /></div></div></div>) : (<div className="w-full max-w-5xl flex-1 flex flex-col items-center my-auto"><div className="flex items-center justify-center w-full gap-4 md:gap-8"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronLeft" size={32} /></button><div className="perspective-1000 w-full max-w-2xl h-[350px] md:h-[500px] cursor-pointer group relative" onClick={handleFlip}><div className={`relative w-full h-full text-center transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}><div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden" style={{ backgroundColor: theme.frontBg, color: theme.frontText }}><div className="h-2 w-full" style={{ backgroundColor: `${theme.progressColor}33` }}><div className="h-full transition-all duration-300" style={{ width: `${(((currentCardIndex || 0) + 1) / (currentItem.cards?.length || 1)) * 100}%`, backgroundColor: theme.progressColor }}></div></div><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><div className="flex justify-between items-center w-full opacity-50"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded">Pergunta</span><span className="text-xs font-mono">{currentCardIndex + 1}/{currentItem.cards?.length || 0}</span></div><h2 className="text-2xl md:text-3xl font-semibold leading-snug">{currentCard ? currentCard.front : ""}</h2></div></div><div className="p-4 text-xs font-medium border-t border-black/5 opacity-50">Toque para virar</div></div><div className="absolute w-full h-full backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-700 overflow-hidden" style={{ backgroundColor: theme.backBg, color: theme.backText }}><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded self-center opacity-60">Resposta</span><p className="text-xl md:text-2xl font-light leading-relaxed whitespace-pre-wrap">{currentCard ? currentCard.back : ""}</p>{currentCard && (<button onClick={(e) => { e.stopPropagation(); const q = encodeURIComponent(`${currentCard.front} ${currentCard.back} explicar detalhadamente`).replace(/%20/g, '+'); window.open(`https://www.google.com/search?udm=50&aep=11&q=${q}`, '_blank'); }} className="mt-4 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-current opacity-60 hover:opacity-100 hover:bg-white/10 transition-all self-center"><Icon name="search" size={14} /> Saber mais</button>)}</div></div><div className="p-4 text-xs font-medium border-t border-white/10 opacity-50">Próximo...</div></div></div></div><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronRight" size={32} /></button></div><div className="flex md:hidden items-center justify-between w-full max-w-2xl mt-6 gap-4"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronLeft" size={24} /></button><button onClick={(e) => { e.stopPropagation(); handleFlip(); }} className="flex-1 py-4 text-white rounded-xl shadow font-semibold flex justify-center items-center gap-2" style={{ backgroundColor: theme.progressColor }}><Icon name="rotateCw" size={20} /> Virar</button><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronRight" size={24} /></button></div></div>)}</div></div>
-                        <div className={`fixed inset-0 z-40 bg-white flex flex-col transition-transform duration-300 md:relative md:translate-x-0 md:border-l border-gray-200 md:order-2 h-full ${showQueue ? 'translate-x-0' : 'translate-x-full'}`} style={isDesktop ? { width: sidebarWidth } : {}}><div className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-400 z-50 transition-colors" onMouseDown={startResizing} style={{ backgroundColor: isResizing ? '#3b82f6' : 'transparent', touchAction: 'none' }} /><div className="p-4 bg-gray-50 border-b shrink-0 flex flex-col gap-3"><div className="flex justify-between items-center"><h2 className="font-bold text-gray-700 flex items-center gap-2"><Icon name="layers" size={20} /> Explorador</h2><div className="flex gap-1"><button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-200 rounded"><Icon name="settings" size={18}/></button><button onClick={() => setShowStats(true)} className={`p-2 hover:bg-gray-200 rounded ${saveStatus==='saved_cloud'?'text-green-500':''}`}><Icon name="barChart" size={18}/></button><button onClick={() => setShowQueue(false)} className="md:hidden p-2 hover:bg-gray-200 rounded"><Icon name="x" size={20}/></button></div></div><div className="flex items-center gap-1 text-sm overflow-x-auto whitespace-nowrap pb-1 custom-scroll">{activeFilters.length > 0 ? (<div className="flex items-center justify-between w-full"><span className="text-sm font-bold text-purple-600 flex items-center gap-1"><Icon name="filter" size={14}/> Filtro Ativo ({activeFilters.length})</span><button onClick={clearFilters} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button></div>) : (<><button onClick={() => setCurrentFolderId(null)} className={`flex items-center hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${!currentFolderId ? 'font-bold text-blue-700' : 'text-gray-500'}`}><Icon name="home" size={14} className="mr-1"/> Início</button>{breadcrumbs.map((folder, i) => (<React.Fragment key={folder.id}><span className="text-gray-300">/</span><button onClick={() => setCurrentFolderId(folder.id)} className={`hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${i === breadcrumbs.length - 1 ? 'font-bold text-blue-700' : 'text-gray-500'}`}>{folder.name}</button></React.Fragment>))}</>)}</div></div><div className="flex-1 overflow-y-auto p-2 space-y-1">{!activeFilters.length && currentFolderId && (<button onClick={() => { const curr = items.find(i => i.id === currentFolderId); setCurrentFolderId(curr ? curr.parentId : null); }} className="w-full text-left p-2 hover:bg-gray-100 rounded text-gray-500 text-sm flex items-center gap-2 mb-2"><Icon name="cornerUpLeft" size={16} /> .. Voltar</button>)}{currentFolderItems.map(item => (<div key={item.id} className={`group relative p-2 rounded-lg border transition-all cursor-pointer select-none grid grid-cols-[auto_1fr_auto] gap-3 items-center ${item.id === activeDeckId ? 'bg-blue-50 border-blue-300 shadow-sm ring-1 ring-blue-200' : 'bg-white border-gray-100 hover:border-gray-300 hover:bg-gray-50'}`} onClick={() => { if (item.type === 'folder') setCurrentFolderId(item.id); else selectDeck(item.id); }}><div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.type === 'folder' ? 'bg-yellow-100 text-yellow-600' : item.type === 'note' ? 'bg-indigo-100 text-indigo-600' : item.type === 'pdf' ? 'bg-red-100 text-red-600' : item.type === 'video' ? 'bg-pink-100 text-pink-600' : item.type === 'image' ? 'bg-purple-100 text-purple-600' : (item.id === activeDeckId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500')}`}><Icon name={item.type === 'folder' ? 'folder' : item.type === 'note' ? 'fileText' : item.type === 'pdf' ? 'fileText' : item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : 'play'} size={14} className={item.id === activeDeckId ? "ml-0.5" : ""} /></div><div className="min-w-0">{editingItemId === item.id ? (<div className="flex items-center gap-1" onClick={e => e.stopPropagation()}><input ref={editInputRef} value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => { if(e.key==='Enter') saveRename(e); if(e.key==='Escape') setEditingItemId(null); }} className="w-full text-sm border rounded px-1 py-0.5 focus:border-blue-500 outline-none" /><button onClick={saveRename} className="text-green-600 p-1"><Icon name="check" size={14}/></button></div>) : (<div><p className={`text-sm font-medium truncate ${item.id === activeDeckId ? 'text-blue-900' : 'text-gray-700'}`}>{item.name}</p><div className="flex items-center gap-2 mt-0.5">{item.type === 'folder' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{countItemsInFolder(item.id)} itens</span> : item.type === 'note' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">Nota</span> : item.type === 'pdf' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">PDF Local</span> : item.type === 'video' ? <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 rounded-full">Vídeo</span> : item.type === 'image' ? <><span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 rounded-full">Imagem</span><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full max-w-[80px] truncate">{getHostname(item.content)}</span></> : <><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{Math.round(((item.progress || 0) / (item.cards?.length || 1)) * 100)}%</span>{item.completions > 0 && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 rounded-full flex items-center gap-1 font-bold"><Icon name="trophy" size={8} /> {item.completions}</span>}</>}</div></div>)}</div>{editingItemId !== item.id && (<div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><div className="flex items-center gap-1 mr-2"><button onClick={(e) => downloadItem(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Baixar"><Icon name="download" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'copy')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Copiar"><Icon name="copy" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'cut')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-orange-600 rounded" title="Recortar"><Icon name="scissors" size={14} /></button><button onClick={(e) => startRenaming(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-green-600 rounded" title="Renomear"><Icon name="edit2" size={14} /></button><button onClick={(e) => deleteItem(e, item.id)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-red-600 rounded" title="Excluir"><Icon name="trash2" size={14} /></button></div></div>)}</div>))}{currentFolderItems.length === 0 && (<div className="text-center text-gray-400 py-8 text-sm italic">{activeFilters.length > 0 ? "Nenhum arquivo encontrado." : "Pasta vazia"}</div>)}</div><div className="p-4 bg-gray-50 border-t shrink-0 flex flex-col gap-2">{clipboard ? (<div className="flex gap-2 w-full"><button onClick={pasteItems} className="flex-1 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-medium flex items-center justify-center gap-2 border border-orange-200 animate-pulse"><Icon name="clipboard" size={16} /> Colar {clipboard.items.length} item(s) ({clipboard.mode === 'cut' ? 'Recortado' : 'Copiado'})</button><button onClick={cancelClipboard} className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded-lg"><Icon name="x" size={16} /></button></div>) : (<div className="flex gap-2"><div className="relative flex-1"><button onClick={() => setShowNewMenu(!showNewMenu)} className="w-full py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="plus" size={16} /> Novo</button>{showNewMenu && (<div className="absolute bottom-full left-0 w-full mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200"><button onClick={createFolder} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 border-b border-gray-50"><Icon name="folderPlus" size={16} className="text-yellow-500"/> Pasta</button><button onClick={createNote} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="fileText" size={16} className="text-indigo-500"/> Nota (Texto)</button><button onClick={createVideo} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="video" size={16} className="text-pink-500"/> Vídeo (Iframe)</button><button onClick={createImage} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="image" size={16} className="text-purple-500"/> Imagem (URL)</button></div>)}</div><button onClick={() => fileInputRef.current.click()} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="filePlus" size={16} /> Importar</button><div className="relative"><button onClick={() => setShowFilterMenu(!showFilterMenu)} className={`h-full px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors ${activeFilters.length > 0 ? 'bg-purple-50 text-purple-600 border-purple-200 ring-1 ring-purple-200' : ''}`} title="Filtrar"><Icon name="filter" size={16} /></button>{showFilterMenu && (<div className="absolute bottom-full right-0 w-48 mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200 z-50"><div className="p-3 border-b bg-gray-50 text-xs font-bold text-gray-500 uppercase">Filtrar por Tipo</div><div className="p-2 space-y-1">{[{id: 'deck', label: 'Flashcards', color: 'bg-blue-500'},{id: 'note', label: 'Notas', color: 'bg-indigo-500'},{id: 'pdf', label: 'PDF', color: 'bg-red-500'},{id: 'video', label: 'Vídeo', color: 'bg-pink-500'},{id: 'image', label: 'Imagem', color: 'bg-purple-500'}].map(type => (<button key={type.id} onClick={() => toggleFilter(type.id)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${activeFilters.includes(type.id) ? 'bg-gray-100 font-medium text-gray-900' : 'hover:bg-gray-50 text-gray-600'}`}><span className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${type.color}`}></span>{type.label}</span>{activeFilters.includes(type.id) && <Icon name="check" size={14} className="text-green-600"/>}</button>))}</div>{activeFilters.length > 0 && <div className="p-2 border-t bg-gray-50"><button onClick={clearFilters} className="w-full py-1.5 text-xs text-red-600 hover:bg-red-50 rounded font-medium">Limpar Filtros</button></div>}</div>)}</div></div>)}<input type="file" accept=".csv, .txt, .pdf" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" /></div></div>
+                        <div className="flex-1 flex flex-col h-full relative order-2 md:order-1 overflow-hidden"><div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center shadow-sm shrink-0"><span className="font-bold text-gray-700 truncate mr-2">{currentItem ? currentItem.name : "Selecione"}</span><button onClick={() => setShowQueue(!showQueue)} className="p-2 bg-gray-100 rounded"><Icon name="layers" size={20} /></button></div><div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">{!currentItem ? (<div className="text-center text-gray-400 my-auto"><Icon name="arrow-up" size={48} className="mx-auto mb-4 opacity-20 rotate-90 md:rotate-0" /><p>Selecione um item.</p></div>) : currentItem.type === 'note' ? (<div className="w-full max-w-4xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-blue-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Salvo auto</span></div><textarea className="flex-1 p-6 w-full resize-none focus:outline-none text-gray-700 font-mono text-sm leading-relaxed" value={currentItem.content || ''} onChange={(e) => updateNoteContent(currentItem.id, e.target.value)} placeholder="Digite..."></textarea></div>) : currentItem.type === 'edital' ? (
+                            // --- VISUALIZADOR DE EDITAL ---
+                            <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
+                                <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0">
+                                    <div className="flex items-center gap-2 font-semibold text-gray-700">
+                                        <Icon name="list" size={18} className="text-green-500" />
+                                        {currentItem.name}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => {
+                                            const isEditing = currentItem.isEditing;
+                                            setItems(prev => prev.map(i => i.id === currentItem.id ? { ...i, isEditing: !isEditing } : i));
+                                        }} className="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded font-medium transition-colors">
+                                            {currentItem.isEditing ? "Ver Checkbox" : "Editar JSON"}
+                                        </button>
+                                        <span className="text-xs text-gray-400 self-center">Edital</span>
+                                    </div>
+                                </div>
+                                {currentItem.isEditing ? (
+                                    <textarea 
+                                        className="flex-1 p-6 w-full resize-none focus:outline-none text-gray-700 font-mono text-xs leading-relaxed bg-slate-50" 
+                                        value={currentItem.content || ''} 
+                                        onChange={(e) => updateEditalContent(currentItem.id, e.target.value)} 
+                                        placeholder="Cole o JSON aqui..."
+                                    ></textarea>
+                                ) : (
+                                    <div className="flex-1 overflow-y-auto p-6 custom-scroll">
+                                        {(() => {
+                                            try {
+                                                const data = JSON.parse(currentItem.content);
+                                                if (!data.disciplinas) return <div className="text-red-500">JSON inválido: Falta 'disciplinas'.</div>;
+                                                return (
+                                                    <div className="space-y-8">
+                                                        {data.disciplinas.map(disc => (
+                                                            <div key={disc.id} className="border-l-4 border-blue-500 pl-4">
+                                                                <h2 className="text-xl font-bold text-gray-800 mb-4">{disc.titulo}</h2>
+                                                                <div className="space-y-4">
+                                                                    {disc.itens.map(item => {
+                                                                        const isChecked = currentItem.progressMap?.[disc.id]?.[item.path] || false;
+                                                                        return (
+                                                                            <div key={item.path} className="group">
+                                                                                <div className="flex items-start gap-3">
+                                                                                    <div className="pt-1">
+                                                                                        <input 
+                                                                                            type="checkbox" 
+                                                                                            checked={isChecked}
+                                                                                            onChange={(e) => updateEditalProgress(currentItem.id, disc.id, item.path, e.target.checked)}
+                                                                                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div className="flex-1">
+                                                                                        <h3 className={`font-semibold text-gray-800 ${isChecked ? 'line-through text-gray-400' : ''}`}>
+                                                                                            {item.path}. {item.titulo}
+                                                                                        </h3>
+                                                                                        <div 
+                                                                                            className="text-sm text-gray-600 mt-1 cursor-pointer hover:text-blue-600 hover:bg-blue-50 p-1 -ml-1 rounded transition-colors inline-block"
+                                                                                            onClick={() => handleSmartSearch(disc.titulo, item.aula)}
+                                                                                            title="Clique para buscar este conteúdo no Explorer"
+                                                                                        >
+                                                                                            <span className="font-bold text-blue-600">({item.aula})</span> - {item.descricao}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            } catch (e) {
+                                                return <div className="text-red-500 p-4">Erro ao ler JSON: {e.message}</div>;
+                                            }
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+                        ) : currentItem.type === 'pdf' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-red-500" />{currentItem.name}</div><span className="text-xs text-gray-400">PDF Local</span></div>{pdfUrl ? (<iframe src={`PDF%20LEITOR.html?id=${currentItem.id}`} className="w-full h-full border-none" title="PDF Viewer"></iframe>) : pdfMissing ? (<div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-500 space-y-4"><Icon name="fileText" size={48} className="text-gray-300" /><div><h3 className="font-bold text-gray-700">Arquivo não encontrado</h3><p className="text-xs mt-1">O PDF <b>{currentItem.name}.pdf</b> é local.</p></div><button onClick={() => restorePdfRef.current.click()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors">Localizar PDF</button><input ref={restorePdfRef} type="file" accept=".pdf" onChange={handlePdfRestore} className="hidden" /></div>) : (<div className="flex-1 flex items-center justify-center text-gray-400">Carregando...</div>)}</div>) : currentItem.type === 'video' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="video" size={18} className="text-pink-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Vídeo Link</span></div><div className="flex-1 bg-black relative"><iframe src={getEmbedUrl(currentItem.content)} className="absolute inset-0 w-full h-full border-none" title={currentItem.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div></div>) : currentItem.type === 'image' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="image" size={18} className="text-purple-500" />{currentItem.name}</div><div className="flex items-center gap-2"><span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{getHostname(currentItem.content)}</span><span className="text-xs text-gray-400">Imagem Web</span></div></div><div className="flex-1 bg-gray-100 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing" onMouseDown={handleImageMouseDown} onMouseMove={handleImageMouseMove} onMouseUp={handleImageMouseUp} onMouseLeave={handleImageMouseUp}><div className="absolute top-4 right-4 z-10 flex gap-2 bg-white/80 p-1 rounded-lg shadow backdrop-blur-sm"><button onClick={() => setImageZoom(z => Math.max(0.1, z - 0.1))} className="p-1 hover:bg-gray-200 rounded"><Icon name="minus" size={16}/></button><span className="text-xs w-8 text-center self-center">{Math.round(imageZoom * 100)}%</span><button onClick={() => setImageZoom(z => z + 0.1)} className="p-1 hover:bg-gray-200 rounded"><Icon name="plus" size={16}/></button><button onClick={resetImage} className="p-1 hover:bg-gray-200 rounded text-red-500" title="Resetar"><Icon name="rotateCcw" size={16}/></button></div><div className="w-full h-full flex items-center justify-center pointer-events-none"><img src={currentItem.content} alt={currentItem.name} style={{ transform: `translate(${imagePos.x}px, ${imagePos.y}px) scale(${imageZoom})`, transformOrigin: 'center', transition: isDraggingImage ? 'none' : 'transform 0.2s ease-out', cursor: isDraggingImage ? 'grabbing' : 'grab' }} className="max-w-full max-h-full object-contain pointer-events-auto" draggable="false" onError={(e) => {e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x300?text=Erro+ao+carregar+imagem'}} /></div></div></div>) : (<div className="w-full max-w-5xl flex-1 flex flex-col items-center my-auto"><div className="flex items-center justify-center w-full gap-4 md:gap-8"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronLeft" size={32} /></button><div className="perspective-1000 w-full max-w-2xl h-[350px] md:h-[500px] cursor-pointer group relative" onClick={handleFlip}><div className={`relative w-full h-full text-center transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}><div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden" style={{ backgroundColor: theme.frontBg, color: theme.frontText }}><div className="h-2 w-full" style={{ backgroundColor: `${theme.progressColor}33` }}><div className="h-full transition-all duration-300" style={{ width: `${(((currentCardIndex || 0) + 1) / (currentItem.cards?.length || 1)) * 100}%`, backgroundColor: theme.progressColor }}></div></div><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><div className="flex justify-between items-center w-full opacity-50"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded">Pergunta</span><span className="text-xs font-mono">{currentCardIndex + 1}/{currentItem.cards?.length || 0}</span></div><h2 className="text-2xl md:text-3xl font-semibold leading-snug">{currentCard ? currentCard.front : ""}</h2></div></div><div className="p-4 text-xs font-medium border-t border-black/5 opacity-50">Toque para virar</div></div><div className="absolute w-full h-full backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-700 overflow-hidden" style={{ backgroundColor: theme.backBg, color: theme.backText }}><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded self-center opacity-60">Resposta</span><p className="text-xl md:text-2xl font-light leading-relaxed whitespace-pre-wrap">{currentCard ? currentCard.back : ""}</p>{currentCard && (<button onClick={(e) => { e.stopPropagation(); const q = encodeURIComponent(`${currentCard.front} ${currentCard.back} explicar detalhadamente`).replace(/%20/g, '+'); window.open(`https://www.google.com/search?udm=50&aep=11&q=${q}`, '_blank'); }} className="mt-4 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-current opacity-60 hover:opacity-100 hover:bg-white/10 transition-all self-center"><Icon name="search" size={14} /> Saber mais</button>)}</div></div><div className="p-4 text-xs font-medium border-t border-white/10 opacity-50">Próximo...</div></div></div></div><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronRight" size={32} /></button></div><div className="flex md:hidden items-center justify-between w-full max-w-2xl mt-6 gap-4"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronLeft" size={24} /></button><button onClick={(e) => { e.stopPropagation(); handleFlip(); }} className="flex-1 py-4 text-white rounded-xl shadow font-semibold flex justify-center items-center gap-2" style={{ backgroundColor: theme.progressColor }}><Icon name="rotateCw" size={20} /> Virar</button><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronRight" size={24} /></button></div></div>)}</div></div>
+                        <div className={`fixed inset-0 z-40 bg-white flex flex-col transition-transform duration-300 md:relative md:translate-x-0 md:border-l border-gray-200 md:order-2 h-full ${showQueue ? 'translate-x-0' : 'translate-x-full'}`} style={isDesktop ? { width: sidebarWidth } : {}}><div className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-400 z-50 transition-colors" onMouseDown={startResizing} style={{ backgroundColor: isResizing ? '#3b82f6' : 'transparent', touchAction: 'none' }} /><div className="p-4 bg-gray-50 border-b shrink-0 flex flex-col gap-3"><div className="flex justify-between items-center"><h2 className="font-bold text-gray-700 flex items-center gap-2"><Icon name="layers" size={20} /> Explorador</h2><div className="flex gap-1"><button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-200 rounded"><Icon name="settings" size={18}/></button><button onClick={() => setShowStats(true)} className={`p-2 hover:bg-gray-200 rounded ${saveStatus==='saved_cloud'?'text-green-500':''}`}><Icon name="barChart" size={18}/></button><button onClick={() => setShowQueue(false)} className="md:hidden p-2 hover:bg-gray-200 rounded"><Icon name="x" size={20}/></button></div></div><div className="flex items-center gap-1 text-sm overflow-x-auto whitespace-nowrap pb-1 custom-scroll">{searchTerm ? (<div className="flex items-center justify-between w-full"><span className="text-sm font-bold text-blue-600 flex items-center gap-1"><Icon name="search" size={14}/> Busca: "{searchTerm}"</span><button onClick={clearSearch} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button></div>) : activeFilters.length > 0 ? (<div className="flex items-center justify-between w-full"><span className="text-sm font-bold text-purple-600 flex items-center gap-1"><Icon name="filter" size={14}/> Filtro Ativo ({activeFilters.length})</span><button onClick={clearFilters} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button></div>) : (<><button onClick={() => setCurrentFolderId(null)} className={`flex items-center hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${!currentFolderId ? 'font-bold text-blue-700' : 'text-gray-500'}`}><Icon name="home" size={14} className="mr-1"/> Início</button>{breadcrumbs.map((folder, i) => (<React.Fragment key={folder.id}><span className="text-gray-300">/</span><button onClick={() => setCurrentFolderId(folder.id)} className={`hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${i === breadcrumbs.length - 1 ? 'font-bold text-blue-700' : 'text-gray-500'}`}>{folder.name}</button></React.Fragment>))}</>)}</div></div><div className="flex-1 overflow-y-auto p-2 space-y-1">{!activeFilters.length && !searchTerm && currentFolderId && (<button onClick={() => { const curr = items.find(i => i.id === currentFolderId); setCurrentFolderId(curr ? curr.parentId : null); }} className="w-full text-left p-2 hover:bg-gray-100 rounded text-gray-500 text-sm flex items-center gap-2 mb-2"><Icon name="cornerUpLeft" size={16} /> .. Voltar</button>)}{currentFolderItems.map(item => (<div key={item.id} className={`group relative p-2 rounded-lg border transition-all cursor-pointer select-none grid grid-cols-[auto_1fr_auto] gap-3 items-center ${item.id === activeDeckId ? 'bg-blue-50 border-blue-300 shadow-sm ring-1 ring-blue-200' : 'bg-white border-gray-100 hover:border-gray-300 hover:bg-gray-50'}`} onClick={() => { if (item.type === 'folder') { setCurrentFolderId(item.id); setSearchTerm(""); } else selectDeck(item.id); }}><div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.type === 'folder' ? 'bg-yellow-100 text-yellow-600' : item.type === 'note' ? 'bg-indigo-100 text-indigo-600' : item.type === 'pdf' ? 'bg-red-100 text-red-600' : item.type === 'video' ? 'bg-pink-100 text-pink-600' : item.type === 'image' ? 'bg-purple-100 text-purple-600' : item.type === 'edital' ? 'bg-green-100 text-green-600' : (item.id === activeDeckId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500')}`}><Icon name={item.type === 'folder' ? 'folder' : item.type === 'note' ? 'fileText' : item.type === 'pdf' ? 'fileText' : item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : item.type === 'edital' ? 'list' : 'play'} size={14} className={item.id === activeDeckId ? "ml-0.5" : ""} /></div><div className="min-w-0">{editingItemId === item.id ? (<div className="flex items-center gap-1" onClick={e => e.stopPropagation()}><input ref={editInputRef} value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => { if(e.key==='Enter') saveRename(e); if(e.key==='Escape') setEditingItemId(null); }} className="w-full text-sm border rounded px-1 py-0.5 focus:border-blue-500 outline-none" /><button onClick={saveRename} className="text-green-600 p-1"><Icon name="check" size={14}/></button></div>) : (<div><p className={`text-sm font-medium truncate ${item.id === activeDeckId ? 'text-blue-900' : 'text-gray-700'}`}>{item.name}</p><div className="flex items-center gap-2 mt-0.5">{item.type === 'folder' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{countItemsInFolder(item.id)} itens</span> : item.type === 'note' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">Nota</span> : item.type === 'pdf' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">PDF Local</span> : item.type === 'video' ? <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 rounded-full">Vídeo</span> : item.type === 'image' ? <><span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 rounded-full">Imagem</span><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full max-w-[80px] truncate">{getHostname(item.content)}</span></> : item.type === 'edital' ? <span className="text-[10px] bg-green-100 text-green-600 px-1.5 rounded-full">Edital/Checklist</span> : <><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{Math.round(((item.progress || 0) / (item.cards?.length || 1)) * 100)}%</span>{item.completions > 0 && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 rounded-full flex items-center gap-1 font-bold"><Icon name="trophy" size={8} /> {item.completions}</span>}</>}</div></div>)}</div>{editingItemId !== item.id && (<div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><div className="flex items-center gap-1 mr-2"><button onClick={(e) => downloadItem(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Baixar"><Icon name="download" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'copy')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Copiar"><Icon name="copy" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'cut')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-orange-600 rounded" title="Recortar"><Icon name="scissors" size={14} /></button><button onClick={(e) => startRenaming(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-green-600 rounded" title="Renomear"><Icon name="edit2" size={14} /></button><button onClick={(e) => deleteItem(e, item.id)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-red-600 rounded" title="Excluir"><Icon name="trash2" size={14} /></button></div></div>)}</div>))}{currentFolderItems.length === 0 && (<div className="text-center text-gray-400 py-8 text-sm italic">{searchTerm ? "Nenhum resultado para a busca." : activeFilters.length > 0 ? "Nenhum arquivo encontrado." : "Pasta vazia"}</div>)}</div><div className="p-4 bg-gray-50 border-t shrink-0 flex flex-col gap-2">{clipboard ? (<div className="flex gap-2 w-full"><button onClick={pasteItems} className="flex-1 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-medium flex items-center justify-center gap-2 border border-orange-200 animate-pulse"><Icon name="clipboard" size={16} /> Colar {clipboard.items.length} item(s) ({clipboard.mode === 'cut' ? 'Recortado' : 'Copiado'})</button><button onClick={cancelClipboard} className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded-lg"><Icon name="x" size={16} /></button></div>) : (<div className="flex gap-2"><div className="relative flex-1"><button onClick={() => setShowNewMenu(!showNewMenu)} className="w-full py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="plus" size={16} /> Novo</button>{showNewMenu && (<div className="absolute bottom-full left-0 w-full mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200"><button onClick={createFolder} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 border-b border-gray-50"><Icon name="folderPlus" size={16} className="text-yellow-500"/> Pasta</button><button onClick={createNote} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="fileText" size={16} className="text-indigo-500"/> Nota (Texto)</button><button onClick={createEdital} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="list" size={16} className="text-green-500"/> Edital (JSON/Checklist)</button><button onClick={createVideo} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="video" size={16} className="text-pink-500"/> Vídeo (Iframe)</button><button onClick={createImage} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="image" size={16} className="text-purple-500"/> Imagem (URL)</button></div>)}</div><button onClick={() => fileInputRef.current.click()} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="filePlus" size={16} /> Importar</button><div className="relative"><button onClick={() => setShowFilterMenu(!showFilterMenu)} className={`h-full px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors ${activeFilters.length > 0 ? 'bg-purple-50 text-purple-600 border-purple-200 ring-1 ring-purple-200' : ''}`} title="Filtrar"><Icon name="filter" size={16} /></button>{showFilterMenu && (<div className="absolute bottom-full right-0 w-48 mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200 z-50"><div className="p-3 border-b bg-gray-50 text-xs font-bold text-gray-500 uppercase">Filtrar por Tipo</div><div className="p-2 space-y-1">{[{id: 'deck', label: 'Flashcards', color: 'bg-blue-500'},{id: 'note', label: 'Notas', color: 'bg-indigo-500'},{id: 'edital', label: 'Editais', color: 'bg-green-500'},{id: 'pdf', label: 'PDF', color: 'bg-red-500'},{id: 'video', label: 'Vídeo', color: 'bg-pink-500'},{id: 'image', label: 'Imagem', color: 'bg-purple-500'}].map(type => (<button key={type.id} onClick={() => toggleFilter(type.id)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${activeFilters.includes(type.id) ? 'bg-gray-100 font-medium text-gray-900' : 'hover:bg-gray-50 text-gray-600'}`}><span className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${type.color}`}></span>{type.label}</span>{activeFilters.includes(type.id) && <Icon name="check" size={14} className="text-green-600"/>}</button>))}</div>{activeFilters.length > 0 && <div className="p-2 border-t bg-gray-50"><button onClick={clearFilters} className="w-full py-1.5 text-xs text-red-600 hover:bg-red-50 rounded font-medium">Limpar Filtros</button></div>}</div>)}</div></div>)}<input type="file" accept=".csv, .txt, .pdf" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" /></div></div>
                     {showSettings && <SettingsModal />}
                     {showStats && <StatsModal />}
                     {showCompletionModal && <CompletionModal />}
