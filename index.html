@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flashcard Flow - Cloud Pro v2.1.1</title>
+    <title>Flashcard Flow - Cloud Pro v2.1.9 (Optimized)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +17,9 @@
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Marked.js for Markdown Support -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -50,6 +53,26 @@
         .select-none-important { user-select: none !important; -webkit-user-select: none !important; }
         .cursor-grab { cursor: grab; }
         .cursor-grabbing { cursor: grabbing; }
+
+        /* --- Estilos para o Preview do Markdown --- */
+        .markdown-preview { color: #374151; line-height: 1.6; }
+        .markdown-preview h1 { font-size: 1.8em; font-weight: 700; margin-bottom: 0.5em; color: #111827; margin-top: 0.5em; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.2em; }
+        .markdown-preview h2 { font-size: 1.4em; font-weight: 600; margin-top: 1.2em; margin-bottom: 0.5em; color: #1f2937; }
+        .markdown-preview h3 { font-size: 1.2em; font-weight: 600; margin-top: 1em; margin-bottom: 0.5em; }
+        .markdown-preview p { margin-bottom: 1em; }
+        .markdown-preview ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+        .markdown-preview ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 1em; }
+        .markdown-preview li { margin-bottom: 0.25em; }
+        .markdown-preview blockquote { border-left: 4px solid #e5e7eb; padding-left: 1em; color: #6b7280; margin-bottom: 1em; font-style: italic; background-color: #f9fafb; padding: 0.5em 1em; border-radius: 0 4px 4px 0; }
+        .markdown-preview code { background-color: #f3f4f6; padding: 0.2em 0.4em; border-radius: 0.25em; font-size: 0.9em; font-family: monospace; color: #dc2626; }
+        .markdown-preview pre { background-color: #1f2937; color: #f3f4f6; padding: 1em; border-radius: 0.5em; overflow-x: auto; margin-bottom: 1em; }
+        .markdown-preview pre code { background-color: transparent; color: inherit; padding: 0; }
+        .markdown-preview a { color: #2563eb; text-decoration: underline; }
+        .markdown-preview hr { margin: 2em 0; border-top: 1px solid #e5e7eb; }
+        .markdown-preview table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
+        .markdown-preview th, .markdown-preview td { border: 1px solid #e5e7eb; padding: 0.5em; text-align: left; }
+        .markdown-preview th { background-color: #f9fafb; font-weight: 600; }
+        .markdown-preview strong { font-weight: 700; color: #111827; }
     </style>
 </head>
 <body>
@@ -59,13 +82,14 @@
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
         // --- CONSTANTES ---
-        const APP_VERSION = "2.1.1";
+        const APP_VERSION = "2.1.9";
         const FIREBASE_CONFIG_FIXED = { apiKey: "AIzaSyApOjZZ75TyDD126CyN4kF7dVeoMvAo5dk", authDomain: "estudos-ec4c5.firebaseapp.com", projectId: "estudos-ec4c5", storageBucket: "estudos-ec4c5.firebasestorage.app", messagingSenderId: "152433763794", appId: "1:152433763794:web:31b8b3fc2f2ee7ae4ed40b", measurementId: "G-YVK8REQRF8" };
         const DEFAULT_THEME = { frontBg: '#ffffff', frontText: '#1f2937', backBg: '#0f172a', backText: '#e2e8f0', progressColor: '#3b82f6', headerBg: '#ffffff' };
         
         const THEME_KEY_PREFIX = 'flashcardFlowTheme_v1_';
         const getStorageKey = (u) => `flashcardFlowData_v13_${u ? u.uid : 'guest'}`;
         const getThemeKey = (u) => `${THEME_KEY_PREFIX}${u ? u.uid : 'guest'}`;
+        const TIME_STATS_KEY = 'flashcardFlow_TimeStats_v1';
         
         const DEFAULT_EDITAL_JSON = JSON.stringify({
           "id": "edital_exemplo",
@@ -188,7 +212,9 @@
                 image: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></g>,
                 filter: <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>,
                 fileJson: <g><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12a1 1 0 0 0-1 1v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-1-1z"/></g>,
-                list: <g><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></g>
+                list: <g><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></g>,
+                activity: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>,
+                clock: <g><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></g>
             };
             const key = Object.keys(paths).find(k => k.toLowerCase() === name.replace(/-/g, '').toLowerCase());
             return <svg {...props}>{paths[key] || <circle cx="12" cy="12" r="10"/>}</svg>;
@@ -283,13 +309,16 @@
             const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
             // --- Estados Resize ---
-            const [sidebarWidth, setSidebarWidth] = useState(384); 
+            const [sidebarWidth, setSidebarWidth] = useState(534); 
             const [isResizing, setIsResizing] = useState(false);
             const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
 
             // --- Estados Filtro ---
             const [showFilterMenu, setShowFilterMenu] = useState(false);
             const [activeFilters, setActiveFilters] = useState([]);
+
+            // --- Estado para Visualização de Notas ---
+            const [noteViewMode, setNoteViewMode] = useState('edit'); // 'edit' or 'preview'
 
             const fileInputRef = useRef(null);
             const importInputRef = useRef(null);
@@ -311,6 +340,21 @@
                 const handleResize = () => setIsDesktop(window.innerWidth >= 768);
                 window.addEventListener('resize', handleResize);
                 return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            // --- TIME TRACKER (Global) ---
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    if (document.visibilityState === 'visible') {
+                        const raw = safeLocalStorage.getItem(TIME_STATS_KEY);
+                        let stats = raw ? JSON.parse(raw) : { totalMinutes: 0, days: [] };
+                        stats.totalMinutes = (stats.totalMinutes || 0) + 1; // Add 1 minute (running every 60s)
+                        const today = new Date().toISOString().split('T')[0];
+                        if (!stats.days.includes(today)) stats.days.push(today);
+                        safeLocalStorage.setItem(TIME_STATS_KEY, JSON.stringify(stats));
+                    }
+                }, 60000); // 1 minute
+                return () => clearInterval(interval);
             }, []);
 
             const startResizing = useCallback((e) => { e.preventDefault(); setIsResizing(true); }, []);
@@ -336,7 +380,14 @@
 
             const sanitizeItems = (rawItems) => {
                 if (!Array.isArray(rawItems)) return [];
-                return rawItems.map(item => { if (item.type === 'deck') { return { ...item, cards: Array.isArray(item.cards) ? item.cards : [], progress: Number(item.progress) || 0, completions: Number(item.completions) || 0 }; } return item; });
+                return rawItems.map(item => { 
+                    // Migration safety: Ensure views exist
+                    const baseItem = { ...item, views: item.views || 0 };
+                    if (item.type === 'deck') { 
+                        return { ...baseItem, cards: Array.isArray(item.cards) ? item.cards : [], progress: Number(item.progress) || 0, completions: Number(item.completions) || 0 }; 
+                    } 
+                    return baseItem; 
+                });
             };
 
             const countItemsInFolder = (folderId) => items.filter(i => i.parentId === folderId).length;
@@ -344,6 +395,39 @@
             const readFileAsText = (file) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = (e) => resolve(e.target.result); r.onerror = reject; r.readAsText(file); });
             const parseCSV = (text) => { const lines = text.split('\n').filter(l => l.trim() !== ''); const parseLine = (t) => { const res = []; let cell = ''; let q = false; for(let i=0;i<t.length;i++){ if(t[i]==='"'){ if(q && t[i+1]==='"'){cell+='"';i++}else{q=!q} } else if(t[i]===',' && !q){ res.push(cell.trim()); cell='' } else cell+=t[i]; } res.push(cell.trim()); return res; }; return lines.map((l,i) => { const p = parseLine(l); if(p.length<2 || (i===0 && p[0].toLowerCase().includes('pergunta'))) return null; return { front: p[0], back: p[1] }; }).filter(Boolean); };
             
+            // --- ESTRATÉGIA A: SALVAMENTO GRANULAR (ITEM ÚNICO) ---
+            const saveItemToCloud = async (item) => {
+                if (!user || isGuest || !window.firebaseAppObj) return;
+                const { db, doc, setDoc } = window.firebaseAppObj;
+                const appId = window.firebaseAppObj.config.projectId;
+                try {
+                    // Remove _isDirty before saving to cloud to keep DB clean
+                    const itemToSave = { ...item };
+                    delete itemToSave._isDirty;
+                    
+                    const itemRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'backup', 'items', String(item.id));
+                    await setDoc(itemRef, itemToSave, { merge: true });
+                } catch (e) { console.error("Erro save item:", e); }
+            };
+
+            // --- ESTRATÉGIA B: DIRTY CHECKING (MONITORA MODIFICAÇÕES) ---
+            useEffect(() => {
+                const dirtyItems = items.filter(i => i._isDirty);
+                if (dirtyItems.length === 0) return;
+
+                const timeoutId = setTimeout(() => {
+                    dirtyItems.forEach(item => {
+                        saveItemToCloud(item);
+                    });
+                    // Limpa a flag _isDirty localmente após salvar
+                    setItems(prev => prev.map(i => i._isDirty ? { ...i, _isDirty: false } : i));
+                    setSaveStatus('saved_cloud');
+                    setTimeout(() => setSaveStatus(''), 2000);
+                }, 2000); // 2 segundos de debounce (espera o usuário parar de digitar)
+
+                return () => clearTimeout(timeoutId);
+            }, [items]);
+
             const saveToCloud = async (currItems = items, currTheme = theme) => { 
                 if (!user || isGuest || !window.firebaseAppObj) return; 
                 const { db, doc, setDoc, writeBatch, collection, deleteField } = window.firebaseAppObj; 
@@ -358,7 +442,13 @@
                     for (let i = 0; i < currItems.length; i += chunkSize) {
                         const chunk = currItems.slice(i, i + chunkSize);
                         const batch = writeBatch(db);
-                        chunk.forEach(item => { const itemRef = doc(itemsCollectionRef, String(item.id)); batch.set(itemRef, item); });
+                        chunk.forEach(item => { 
+                            // Garante que não salvamos a flag _isDirty no backup geral
+                            const itemToSave = { ...item };
+                            delete itemToSave._isDirty;
+                            const itemRef = doc(itemsCollectionRef, String(item.id)); 
+                            batch.set(itemRef, itemToSave); 
+                        });
                         await batch.commit();
                     }
                     setLastCloudSave(new Date()); setSaveStatus('saved_cloud'); setTimeout(() => setSaveStatus(''), 3000); 
@@ -379,11 +469,11 @@
                         const shouldReplace = confirm(msg);
                         let newItems = [];
                         if (shouldReplace) {
-                            newItems = rawImport.map(d => ({ ...d, id: d.id || Date.now() + Math.random(), type: d.type || 'deck', parentId: d.parentId || null, completions: d.completions || 0, progress: d.progress || 0 })); 
+                            newItems = rawImport.map(d => ({ ...d, id: d.id || Date.now() + Math.random(), type: d.type || 'deck', parentId: d.parentId || null, completions: d.completions || 0, progress: d.progress || 0, views: d.views || 0 })); 
                         } else if (user) {
                             const idMap = {};
                             const remapped = rawImport.map(d => { const newId = Date.now().toString() + Math.random(); idMap[d.id] = newId; return { ...d, oldId: d.id, id: newId }; });
-                            const finalImport = remapped.map(d => ({ ...d, type: d.type || 'deck', parentId: idMap[d.parentId] || null, completions: d.completions || 0, progress: d.progress || 0 }));
+                            const finalImport = remapped.map(d => ({ ...d, type: d.type || 'deck', parentId: idMap[d.parentId] || null, completions: d.completions || 0, progress: d.progress || 0, views: d.views || 0 }));
                             newItems = [...items, ...finalImport];
                         } else { return; }
                         setItems(sanitizeItems(newItems)); setCurrentFolderId(null); setActiveDeckId(null);
@@ -490,12 +580,39 @@
                 } else if (!currentItem || currentItem.id !== activeDeckId) {
                     setCurrentCardIndex(0);
                 }
+                // Reset note view mode on item change
+                setNoteViewMode('edit');
             }, [currentItem]);
             // ----------------------------------------------------
 
             useEffect(() => { setImageZoom(1); setImagePos({ x: 0, y: 0 }); }, [activeDeckId]);
             const currentCard = useMemo(() => (currentItem && Array.isArray(currentItem.cards)) ? currentItem.cards[currentCardIndex] : null, [currentItem, currentCardIndex]);
             
+            // --- Helper para Calcular Progresso do Edital ---
+            const calculateEditalProgress = useCallback((item) => {
+                if (!item.content) return 0;
+                let total = 0;
+                let lidoCount = 0;
+                try {
+                    const data = JSON.parse(item.content);
+                    if (data.disciplinas) {
+                        data.disciplinas.forEach(d => {
+                            if (d.itens) {
+                                d.itens.forEach(i => {
+                                    total++;
+                                    const p = item.progressMap?.[d.id]?.[i.path];
+                                    const isLido = typeof p === 'boolean' ? p : (p?.lido || false);
+                                    if (isLido) lidoCount++;
+                                });
+                            }
+                        });
+                    }
+                } catch (e) {
+                    return 0;
+                }
+                return total > 0 ? Math.round((lidoCount / total) * 100) : 0;
+            }, []);
+
             // --- LÓGICA DE FILTRAGEM E BUSCA INTELIGENTE DO EXPLORER ---
             const currentFolderItems = useMemo(() => {
                 if (!items) return [];
@@ -564,11 +681,12 @@
                         const contentMatch = iContent.includes(term);
                         return nameMatch || contentMatch;
                     }).sort((a, b) => {
-                         // Ordenação: Edital > Pasta > Resto
-                         if (a.type === 'edital' && b.type !== 'edital') return -1;
-                         if (a.type !== 'edital' && b.type === 'edital') return 1;
-                         if (a.type === 'folder' && b.type !== 'folder') return -1;
-                         if (a.type !== 'folder' && b.type === 'folder') return 1;
+                         // Ordenação: Report > Edital > Pasta > Resto
+                         const typeOrder = { 'report': 0, 'edital': 1, 'folder': 2 };
+                         const orderA = typeOrder[a.type] !== undefined ? typeOrder[a.type] : 3;
+                         const orderB = typeOrder[b.type] !== undefined ? typeOrder[b.type] : 3;
+                         
+                         if (orderA !== orderB) return orderA - orderB;
                          
                          const aName = a.name.toLowerCase().includes(term);
                          const bName = b.name.toLowerCase().includes(term);
@@ -587,22 +705,23 @@
                         targetItems = items.filter(i => allowedParentIds.includes(i.parentId));
                     }
                     return targetItems.filter(i => activeFilters.includes(i.type)).sort((a, b) => {
-                        // Ordenação: Edital > Pasta > Resto
-                        if (a.type === 'edital' && b.type !== 'edital') return -1;
-                        if (a.type !== 'edital' && b.type === 'edital') return 1;
-                        if (a.type === 'folder' && b.type !== 'folder') return -1;
-                        if (a.type !== 'folder' && b.type === 'folder') return 1;
+                        // Ordenação: Report > Edital > Pasta > Resto
+                        const typeOrder = { 'report': 0, 'edital': 1, 'folder': 2 };
+                        const orderA = typeOrder[a.type] !== undefined ? typeOrder[a.type] : 3;
+                        const orderB = typeOrder[b.type] !== undefined ? typeOrder[b.type] : 3;
+                        if (orderA !== orderB) return orderA - orderB;
                         return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
                     });
                 }
 
                 // 3. Navegação normal por pasta
                 return items.filter(i => i.parentId === currentFolderId).sort((a,b) => {
-                    // NOVA ORDENAÇÃO: Edital > Pasta > Resto
-                    if (a.type === 'edital' && b.type !== 'edital') return -1;
-                    if (a.type !== 'edital' && b.type === 'edital') return 1;
-                    if (a.type === 'folder' && b.type !== 'folder') return -1;
-                    if (a.type !== 'folder' && b.type === 'folder') return 1;
+                    // NOVA ORDENAÇÃO: Report > Edital > Pasta > Resto
+                    const typeOrder = { 'report': 0, 'edital': 1, 'folder': 2 };
+                    const orderA = typeOrder[a.type] !== undefined ? typeOrder[a.type] : 3;
+                    const orderB = typeOrder[b.type] !== undefined ? typeOrder[b.type] : 3;
+                    
+                    if (orderA !== orderB) return orderA - orderB;
                     // Se forem do mesmo "grupo" de prioridade, ordena alfabeticamente
                     return a.name.localeCompare(b.name, undefined, {sensitivity: 'base', numeric: true});
                 });
@@ -613,11 +732,10 @@
 
             // ... (createFolder, createNote, createVideo, createImage, toggleFilter, clearFilters) ...
             const createFolder = () => { const name = prompt("Nome:"); if(!name) return; withCloud([...items, {id: Date.now().toString(), type:'folder', name, parentId: currentFolderId}]); setShowNewMenu(false); };
-            const createNote = () => { const name = prompt("Nome:"); if(!name) return; const note = {id: Date.now().toString()+Math.random(), type:'note', name, parentId: currentFolderId, content:''}; withCloud([...items, note]); setActiveDeckId(note.id); setShowNewMenu(false); };
-            const createVideo = () => { const name = prompt("Nome do Vídeo:"); if(!name) return; const url = prompt("Link do Vídeo (URL):"); if(!url) return; const video = {id: Date.now().toString()+Math.random(), type:'video', name, parentId: currentFolderId, content:url}; withCloud([...items, video]); setActiveDeckId(video.id); setShowNewMenu(false); };
-            const createImage = () => { const name = prompt("Nome da Imagem:"); if(!name) return; const url = prompt("Link da Imagem (URL):"); if(!url) return; const image = {id: Date.now().toString()+Math.random(), type:'image', name, parentId: currentFolderId, content:url}; withCloud([...items, image]); setActiveDeckId(image.id); setShowNewMenu(false); };
+            const createNote = () => { const name = prompt("Nome:"); if(!name) return; const note = {id: Date.now().toString()+Math.random(), type:'note', name, parentId: currentFolderId, content:'', views: 0}; openItem(note); setShowNewMenu(false); };
+            const createVideo = () => { const name = prompt("Nome do Vídeo:"); if(!name) return; const url = prompt("Link do Vídeo (URL):"); if(!url) return; const video = {id: Date.now().toString()+Math.random(), type:'video', name, parentId: currentFolderId, content:url, views: 0}; openItem(video); setShowNewMenu(false); };
+            const createImage = () => { const name = prompt("Nome da Imagem:"); if(!name) return; const url = prompt("Link da Imagem (URL):"); if(!url) return; const image = {id: Date.now().toString()+Math.random(), type:'image', name, parentId: currentFolderId, content:url, views: 0}; openItem(image); setShowNewMenu(false); };
             
-            // --- NOVO CRIADOR DE EDITAL ---
             const createEdital = () => {
                 const name = prompt("Nome do Edital:");
                 if (!name) return;
@@ -627,11 +745,63 @@
                     name: name,
                     parentId: currentFolderId,
                     content: DEFAULT_EDITAL_JSON,
-                    progressMap: {}
+                    progressMap: {},
+                    views: 0
                 };
-                withCloud([...items, edital]);
-                setActiveDeckId(edital.id);
+                openItem(edital);
                 setShowNewMenu(false);
+            };
+
+            const createReport = () => {
+                const name = prompt("Nome do Relatório:");
+                if (!name) return;
+                const report = {
+                    id: Date.now().toString() + Math.random(),
+                    type: 'report',
+                    name: name,
+                    parentId: currentFolderId,
+                    created: Date.now(),
+                    views: 0
+                };
+                openItem(report);
+                setShowNewMenu(false);
+            };
+
+            // Nova função para abrir item e incrementar views
+            const openItem = (itemOrId) => {
+                const id = typeof itemOrId === 'object' ? itemOrId.id : itemOrId;
+                
+                // Lógica Anti-Spam de Views:
+                // Se o arquivo já estiver aberto (ativo), não faz nada.
+                if (id === activeDeckId) return;
+
+                // Se for um novo item (objeto), adiciona primeiro
+                if (typeof itemOrId === 'object') {
+                    setItems(prev => {
+                        const newItem = { ...itemOrId, views: (itemOrId.views || 0) + 1 };
+                        if (prev.find(i => i.id === newItem.id)) return prev;
+                        // Marcamos como sujo para salvar individualmente
+                        return [...prev, { ...newItem, _isDirty: true }];
+                    });
+                    setActiveDeckId(id);
+                } else {
+                    // Item existente, apenas incrementa view e marca como sujo
+                    setItems(prev => prev.map(i => i.id === id ? { ...i, views: (i.views || 0) + 1, _isDirty: true } : i));
+                    setActiveDeckId(id);
+                }
+                
+                setIsFlipped(false);
+            };
+
+            // Função específica para clique no menu lateral (já existente item)
+            const handleItemClick = (item) => {
+                if (item.type === 'folder') {
+                    setCurrentFolderId(item.id);
+                    setSearchTerm("");
+                } else {
+                    if (editingItemId) return;
+                    openItem(item.id);
+                }
             };
 
             const toggleFilter = (type) => { setActiveFilters(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]); };
@@ -639,21 +809,35 @@
             const clearSearch = () => { setSearchTerm(""); };
 
             // ... (handleFileUpload, handlePdfRestore, updateDeckProgress, updateNoteContent, handleFlip, handleNext, handlePrev, deleteItem, saveRename, pasteItems, startRenaming, addToClipboard, cancelClipboard) ...
-            const handleFileUpload = async (e) => { const files = Array.from(e.target.files); if(files.length===0) return; const toAdd = []; for(let f of files) { try { const id = Date.now().toString() + Math.random(); if(f.name.endsWith('.pdf')) { await dbHelper.saveFile(id, f); toAdd.push({id, type:'pdf', name:f.name.replace('.pdf',''), parentId:currentFolderId}); } else if(f.name.endsWith('.txt')) { const txt = await readFileAsText(f); toAdd.push({id, type:'note', name:f.name.replace('.txt',''), parentId:currentFolderId, content:txt}); } else { const txt = await readFileAsText(f); const c = parseCSV(txt); if(c.length>0) toAdd.push({id, type:'deck', name:f.name.replace('.csv',''), parentId:currentFolderId, cards:c, progress:0, completions:0}); } } catch(err){ console.error(err); } } if(toAdd.length>0) withCloud([...items, ...toAdd]); e.target.value=''; };
+            const handleFileUpload = async (e) => { const files = Array.from(e.target.files); if(files.length===0) return; const toAdd = []; for(let f of files) { try { const id = Date.now().toString() + Math.random(); if(f.name.endsWith('.pdf')) { await dbHelper.saveFile(id, f); toAdd.push({id, type:'pdf', name:f.name.replace('.pdf',''), parentId:currentFolderId, views: 0}); } else if(f.name.endsWith('.txt')) { const txt = await readFileAsText(f); toAdd.push({id, type:'note', name:f.name.replace('.txt',''), parentId:currentFolderId, content:txt, views: 0}); } else { const txt = await readFileAsText(f); const c = parseCSV(txt); if(c.length>0) toAdd.push({id, type:'deck', name:f.name.replace('.csv',''), parentId:currentFolderId, cards:c, progress:0, completions:0, views: 0}); } } catch(err){ console.error(err); } } if(toAdd.length>0) withCloud([...items, ...toAdd]); e.target.value=''; };
             const handlePdfRestore = async (e) => { const file = e.target.files[0]; if (!file) return; const uploadedName = file.name.replace('.pdf', ''); if (uploadedName !== currentItem.name) { alert(`Erro: O arquivo selecionado (${uploadedName}) não corresponde ao original (${currentItem.name}).`); e.target.value = ''; return; } await dbHelper.saveFile(currentItem.id, file); const url = URL.createObjectURL(file); setPdfUrl(url); setPdfMissing(false); e.target.value = ''; };
             useEffect(() => { if (currentItem?.type === 'pdf') { setPdfMissing(false); dbHelper.getFile(currentItem.id).then(blob => { if (blob) { const url = URL.createObjectURL(blob); setPdfUrl(url); } else { setPdfUrl(null); setPdfMissing(true); } }); } else { if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); } setPdfMissing(false); } }, [activeDeckId, currentItem]);
-            const updateDeckProgress = (id, idx) => setItems(p => p.map(i => i.id===id ? {...i, progress:idx} : i));
-            const updateNoteContent = (id, c) => setItems(p => p.map(i => i.id===id ? {...i, content:c} : i));
+            const updateDeckProgress = (id, idx) => setItems(p => p.map(i => i.id===id ? {...i, progress:idx, _isDirty: true} : i));
+            const updateNoteContent = (id, c) => setItems(p => p.map(i => i.id===id ? {...i, content:c, _isDirty: true} : i));
             
             // --- UPDATES DO EDITAL ---
-            const updateEditalContent = (id, c) => setItems(p => p.map(i => i.id===id ? {...i, content:c} : i));
-            const updateEditalProgress = (id, discId, path, checked) => {
+            const updateEditalContent = (id, c) => setItems(p => p.map(i => i.id===id ? {...i, content:c, _isDirty: true} : i));
+            const updateEditalProgress = (id, discId, path, field, value) => {
                 setItems(prevItems => prevItems.map(item => {
                     if (item.id === id) {
                         const newMap = { ...(item.progressMap || {}) };
                         if (!newMap[discId]) newMap[discId] = {};
-                        newMap[discId][path] = checked;
-                        return { ...item, progressMap: newMap };
+                        
+                        let currentStatus = newMap[discId][path];
+                        if (typeof currentStatus !== 'object' || currentStatus === null) {
+                            currentStatus = { lido: !!currentStatus };
+                        } else {
+                            currentStatus = { ...currentStatus };
+                        }
+
+                        currentStatus[field] = value;
+
+                        if (field === 'facil' && value) currentStatus.dificil = false;
+                        if (field === 'dificil' && value) currentStatus.facil = false;
+
+                        newMap[discId][path] = currentStatus;
+                        // Marca como sujo para salvar automaticamente
+                        return { ...item, progressMap: newMap, _isDirty: true };
                     }
                     return item;
                 }));
@@ -681,15 +865,16 @@
             const handlePrev = () => { if(currentCardIndex > 0){ const n=currentCardIndex-1; setIsFlipped(false); setTimeout(()=>{setCurrentCardIndex(n); updateDeckProgress(activeDeckId, n)},150); } };
             const deleteItem = async (e, id) => { e.stopPropagation(); if(confirm("Tem certeza?")) { const getIds = (r, l) => { let ids=[r]; l.filter(i=>i.parentId===r).forEach(c=>ids.push(...getIds(c.id, l))); return ids; }; const todel = getIds(id, items); todel.forEach(tid => { const it = items.find(x => x.id === tid); if(it && it.type === 'pdf') dbHelper.deleteFile(tid); }); if (user && !isGuest && window.firebaseAppObj) { try { const { db, doc, writeBatch } = window.firebaseAppObj; const appId = window.firebaseAppObj.config.projectId; const chunkSize = 450; for (let i = 0; i < todel.length; i += chunkSize) { const chunk = todel.slice(i, i + chunkSize); const batch = writeBatch(db); chunk.forEach(tid => { const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'backup', 'items', String(tid)); batch.delete(ref); }); await batch.commit(); } } catch (err) { console.error("Erro delete cloud:", err); } } const next = items.filter(i => !todel.includes(i.id)); withCloud(next); if(todel.includes(activeDeckId)) setActiveDeckId(null); } };
             const saveRename = (e) => { e.stopPropagation(); if(tempName.trim()) withCloud(items.map(i => i.id===editingItemId ? {...i, name:tempName} : i)); setEditingItemId(null); };
-            const pasteItems = () => { if(!clipboard) return; const next = [...items]; const targets = items.filter(i=>clipboard.items.includes(i.id)); if(clipboard.mode==='cut') { targets.forEach(t=>{ const idx=next.findIndex(x=>x.id===t.id); if(idx!==-1) next[idx]={...next[idx], parentId:currentFolderId} }); setClipboard(null); } else { targets.forEach(t => { const n={...t, id:Date.now()+Math.random(), parentId:currentFolderId, name:t.name+' (Copiia)'}; if(t.type==='deck'){n.progress=0;n.completions=0;} next.push(n); }); } withCloud(next); };
+            const pasteItems = () => { if(!clipboard) return; const next = [...items]; const targets = items.filter(i=>clipboard.items.includes(i.id)); if(clipboard.mode==='cut') { targets.forEach(t=>{ const idx=next.findIndex(x=>x.id===t.id); if(idx!==-1) next[idx]={...next[idx], parentId:currentFolderId} }); setClipboard(null); } else { targets.forEach(t => { const n={...t, id:Date.now()+Math.random(), parentId:currentFolderId, name:t.name+' (Copiia)', views: 0}; if(t.type==='deck'){n.progress=0;n.completions=0;} next.push(n); }); } withCloud(next); };
             const startRenaming = (e, item) => { e.stopPropagation(); setEditingItemId(item.id); setTempName(item.name); setTimeout(() => editInputRef.current?.focus(), 50); };
             const addToClipboard = (e, item, mode) => { e.stopPropagation(); setClipboard({ mode, items: [item.id] }); };
             const cancelClipboard = () => setClipboard(null);
             
-            useEffect(() => { const h = (e) => { if(!activeDeckId || showSettings || showStats || showCompletionModal || editingItemId) return; if(currentItem?.type==='note' || currentItem?.type==='pdf' || currentItem?.type==='edital') return; if(e.code==='Space'){e.preventDefault(); handleFlip()} else if(e.code==='ArrowRight') handleNext(); else if(e.code==='ArrowLeft') handlePrev(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [activeDeckId, currentCardIndex, isFlipped, showSettings, showStats, showCompletionModal, editingItemId, currentItem]);
+            useEffect(() => { const h = (e) => { if(!activeDeckId || showSettings || showStats || showCompletionModal || editingItemId) return; if(currentItem?.type==='note' || currentItem?.type==='pdf' || currentItem?.type==='edital' || currentItem?.type==='report') return; if(e.code==='Space'){e.preventDefault(); handleFlip()} else if(e.code==='ArrowRight') handleNext(); else if(e.code==='ArrowLeft') handlePrev(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [activeDeckId, currentCardIndex, isFlipped, showSettings, showStats, showCompletionModal, editingItemId, currentItem]);
 
-            const selectDeck = (id) => { if (editingItemId) return; setActiveDeckId(id); setIsFlipped(false); };
-            const finishDeckTransition = (completed) => { setShowCompletionModal(false); const compl = completed ? (currentItem.completions||0)+1 : (currentItem.completions||0); const nextItems = items.map(i => i.id===activeDeckId ? {...i, progress:0, completions: compl} : i); if(completed) saveToCloud(nextItems, theme); setItems(nextItems); setIsFlipped(false); setTimeout(() => { const sibs = items.filter(i => i.parentId === currentItem.parentId && i.type === 'deck').sort((a,b)=>a.name.localeCompare(b.name)); const idx = sibs.findIndex(i=>i.id===activeDeckId); if(idx!==-1 && idx < sibs.length-1) setActiveDeckId(sibs[idx+1].id); else if(sibs.length>0) { setActiveDeckId(sibs[0].id); setCurrentCardIndex(0); } }, 150); };
+            // Substituído por openItem
+            const selectDeck = (id) => { if (editingItemId) return; openItem(id); };
+            const finishDeckTransition = (completed) => { setShowCompletionModal(false); const compl = completed ? (currentItem.completions||0)+1 : (currentItem.completions||0); const nextItems = items.map(i => i.id===activeDeckId ? {...i, progress:0, completions: compl} : i); if(completed) saveToCloud(nextItems, theme); setItems(nextItems); setIsFlipped(false); setTimeout(() => { const sibs = items.filter(i => i.parentId === currentItem.parentId && i.type === 'deck').sort((a,b)=>a.name.localeCompare(b.name)); const idx = sibs.findIndex(i=>i.id===activeDeckId); if(idx!==-1 && idx < sibs.length-1) openItem(sibs[idx+1].id); else if(sibs.length>0) { openItem(sibs[0].id); setCurrentCardIndex(0); } }, 150); };
 
             const handleLogout = () => {
                 setUser(null);
@@ -701,7 +886,7 @@
                 }
             };
 
-            const StatsModal = () => { /* ... mesma lógica de stats ... */
+            const StatsModal = () => {
                 const [memory, setMemory] = useState(null);
                 const [storage, setStorage] = useState({ local: '0', cloud: '0' });
                 const [counts, setCounts] = useState({ deck: 0, note: 0, pdf: 0, video: 0, image: 0, folder: 0 });
@@ -716,7 +901,7 @@
                 return (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative flex flex-col max-h-[90vh]">
-                            <div className="flex justify-between items-center mb-6 border-b pb-2 shrink-0"><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Icon name="bar-chart" size={24} className="text-gray-500"/> Dados e Nuvem</h2><button onClick={() => setShowStats(false)} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={24} /></button></div>
+                            <div className="flex justify-between items-center mb-6 border-b pb-2 shrink-0"><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Icon name="barChart" size={24} className="text-gray-500"/> Dados e Nuvem</h2><button onClick={() => setShowStats(false)} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={24} /></button></div>
                             <div className="overflow-y-auto pr-2 custom-scroll flex-1">
                                 <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
                                     <div className="flex justify-between mb-2"><h3 className="font-bold gap-2 flex items-center"><Icon name="user" size={16}/> Conta</h3>{user && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Online</span>}</div>
@@ -725,15 +910,15 @@
                                 </div>
                                 <div className="mb-6"><h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Estatísticas</h3><div className="grid grid-cols-2 gap-3 mb-3"><div className="bg-gray-100 p-3 rounded-lg"><span className="text-xs text-gray-500 block">RAM</span><span className="font-mono text-sm font-bold text-gray-800">{memory ? memory.used : 'N/A'}</span></div><div className="bg-gray-100 p-3 rounded-lg"><span className="text-xs text-gray-500 block">Local</span><span className="font-mono text-sm font-bold text-gray-800">{storage.local}</span></div></div><div className="grid grid-cols-3 gap-2 text-center"><div className="bg-blue-50 p-2 rounded-lg"><span className="block text-xl font-bold text-blue-700">{counts.deck}</span><span className="text-[10px] uppercase text-blue-400">Decks</span></div><div className="bg-indigo-50 p-2 rounded-lg"><span className="block text-xl font-bold text-indigo-700">{counts.note}</span><span className="text-[10px] uppercase text-indigo-400">Notas</span></div><div className="bg-pink-50 p-2 rounded-lg"><span className="block text-xl font-bold text-pink-700">{counts.video}</span><span className="text-[10px] uppercase text-pink-400">Vídeos</span></div></div></div>
                                 <div className="border-t pt-4"><h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Backup Local</h3><button onClick={handleExportData} className="w-full py-2 mb-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2"><Icon name="download" size={16} /> Exportar</button><div className="relative"><button onClick={() => importInputRef.current.click()} className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2"><Icon name="uploadCloud" size={16} /> Importar</button><input type="file" accept=".json" ref={importInputRef} onChange={handleImportData} className="hidden" /></div></div>
-                                <div className="border-t pt-4 mt-4"><button onClick={() => { if(confirm("Apagar tudo?")) { setItems([]); safeLocalStorage.clear(); setTheme(DEFAULT_THEME); setShowStats(false); } }} className="w-full py-3 bg-red-50 text-red-600 rounded-lg flex items-center justify-center gap-2"><Icon name="trash-2" size={20}/> Resetar App</button></div>
+                                <div className="border-t pt-4 mt-4"><button onClick={() => { if(confirm("Apagar tudo?")) { setItems([]); safeLocalStorage.clear(); setTheme(DEFAULT_THEME); setShowStats(false); } }} className="w-full py-3 bg-red-50 text-red-600 rounded-lg flex items-center justify-center gap-2"><Icon name="trash2" size={20}/> Resetar App</button></div>
                             </div>
                         </div>
                     </div>
                 );
             };
 
-            const CompletionModal = () => ( /* ... */ <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"><div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center"><div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600"><Icon name="trophy" size={32} /></div><h2 className="text-xl font-bold text-gray-800 mb-2">Fim do Baralho!</h2><div className="flex gap-3"><button onClick={() => finishDeckTransition(false)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium">Não</button><button onClick={() => finishDeckTransition(true)} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Sim</button></div></div></div> );
-            const SettingsModal = () => ( /* ... */ <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"><div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative"><div className="flex justify-between items-center mb-6 border-b pb-2"><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Icon name="settings" size={24} /> Cores e Tema</h2><button onClick={() => setShowSettings(false)}><Icon name="x" size={24} /></button></div><div className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Fundo (Frente)</label><input type="color" value={theme.frontBg} onChange={(e) => handleThemeChange('frontBg', e.target.value)} className="h-10 w-full rounded border p-1" /></div></div></div><div className="mt-8 flex justify-between gap-3 border-t pt-4 items-center"><button onClick={resetTheme} className="text-xs text-gray-400 hover:underline">Restaurar Padrão</button><button onClick={() => { setShowSettings(false); setSaveStatus('saved'); setTimeout(() => setSaveStatus(''), 2000); }} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2"><Icon name="check" size={16} /> Salvar</button></div></div></div> );
+            const CompletionModal = () => ( <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"><div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center"><div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600"><Icon name="trophy" size={32} /></div><h2 className="text-xl font-bold text-gray-800 mb-2">Fim do Baralho!</h2><div className="flex gap-3"><button onClick={() => finishDeckTransition(false)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium">Não</button><button onClick={() => finishDeckTransition(true)} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Sim</button></div></div></div> );
+            const SettingsModal = () => ( <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"><div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative"><div className="flex justify-between items-center mb-6 border-b pb-2"><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Icon name="settings" size={24} /> Cores e Tema</h2><button onClick={() => setShowSettings(false)}><Icon name="x" size={24} /></button></div><div className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Fundo (Frente)</label><input type="color" value={theme.frontBg} onChange={(e) => handleThemeChange('frontBg', e.target.value)} className="h-10 w-full rounded border p-1" /></div></div></div><div className="mt-8 flex justify-between gap-3 border-t pt-4 items-center"><button onClick={resetTheme} className="text-xs text-gray-400 hover:underline">Restaurar Padrão</button><button onClick={() => { setShowSettings(false); setSaveStatus('saved'); setTimeout(() => setSaveStatus(''), 2000); }} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2"><Icon name="check" size={16} /> Salvar</button></div></div></div> );
 
             if (!appReady) return <div className="min-h-screen flex items-center justify-center text-gray-500 animate-pulse">Carregando...</div>;
             if (!user && !isGuest) return <AuthScreen onLogin={u => setUser(u)} onGuest={() => setIsGuest(true)} />;
@@ -744,13 +929,13 @@
                         {connectionLog && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg text-sm font-bold z-50 transition-all ${connectionLog.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{connectionLog.msg}</div>}
                         {user && <div className="absolute top-4 left-4 flex items-center gap-2 text-sm text-gray-600"><span className="w-2 h-2 bg-green-500 rounded-full"></span> {user.email}</div>}
                         <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-gray-100 relative">
-                            <button onClick={() => setShowStats(true)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><Icon name="bar-chart" size={20} /></button>
+                            <button onClick={() => setShowStats(true)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><Icon name="barChart" size={20} /></button>
                             <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-600"><Icon name="layers" size={40} /></div>
                             <h1 className="text-2xl font-bold text-gray-800 mb-2">Flashcard Flow</h1>
                             <p className="text-gray-500 mb-8">Seu explorador de estudos está vazio.</p>
                             <div className="space-y-2">
                                 <button onClick={() => setForceExplorer(true)} className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-3"><Icon name="folder" size={20} /> <span>Abrir Explorador</span></button>
-                                <button onClick={() => fileInputRef.current.click()} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-3"><Icon name="file-plus" size={24} /> <span>Importar Arquivo (.csv / .txt / .pdf)</span></button>
+                                <button onClick={() => fileInputRef.current.click()} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-3"><Icon name="filePlus" size={24} /> <span>Importar Arquivo (.csv / .txt / .pdf)</span></button>
                                 <button onClick={() => importInputRef.current.click()} className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-3"><Icon name="uploadCloud" size={20} /> <span>Importar Backup Local</span></button>
                             </div>
                             <input type="file" accept=".csv, .txt, .pdf" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
@@ -769,8 +954,172 @@
                     <div className="h-screen w-full flex flex-col md:flex-row bg-gray-50 overflow-hidden">
                         {/* ... (Main Content & Sidebar - mantidos iguais) ... */}
                         {connectionLog && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg text-sm font-bold z-50 transition-all ${connectionLog.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{connectionLog.msg}</div>}
-                        <div className="flex-1 flex flex-col h-full relative order-2 md:order-1 overflow-hidden"><div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center shadow-sm shrink-0"><span className="font-bold text-gray-700 truncate mr-2">{currentItem ? currentItem.name : "Selecione"}</span><button onClick={() => setShowQueue(!showQueue)} className="p-2 bg-gray-100 rounded"><Icon name="layers" size={20} /></button></div><div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">{!currentItem ? (<div className="text-center text-gray-400 my-auto"><Icon name="arrow-up" size={48} className="mx-auto mb-4 opacity-20 rotate-90 md:rotate-0" /><p>Selecione um item.</p></div>) : currentItem.type === 'note' ? (<div className="w-full max-w-4xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-blue-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Salvo auto</span></div><textarea className="flex-1 p-6 w-full resize-none focus:outline-none text-gray-700 font-mono text-sm leading-relaxed" value={currentItem.content || ''} onChange={(e) => updateNoteContent(currentItem.id, e.target.value)} placeholder="Digite..."></textarea></div>) : currentItem.type === 'edital' ? (
-                            // --- VISUALIZADOR DE EDITAL ---
+                        <div className="flex-1 flex flex-col h-full relative order-2 md:order-1 overflow-hidden"><div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center shadow-sm shrink-0"><span className="font-bold text-gray-700 truncate mr-2">{currentItem ? currentItem.name : "Selecione"}</span><button onClick={() => setShowQueue(!showQueue)} className="p-2 bg-gray-100 rounded"><Icon name="layers" size={20} /></button></div><div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">{!currentItem ? (<div className="text-center text-gray-400 my-auto"><Icon name="arrowUp" size={48} className="mx-auto mb-4 opacity-20 rotate-90 md:rotate-0" /><p>Selecione um item.</p></div>) : currentItem.type === 'note' ? (
+                            <div className="w-full max-w-4xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
+                                <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0">
+                                    <div className="flex items-center gap-2 font-semibold text-gray-700">
+                                        <Icon name="fileText" size={18} className="text-blue-500" />
+                                        {currentItem.name}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs text-gray-400">{noteViewMode === 'edit' ? 'Editando' : 'Visualizando'}</span>
+                                        <button 
+                                            onClick={() => setNoteViewMode(prev => prev === 'edit' ? 'preview' : 'edit')}
+                                            className={`p-1.5 rounded transition-colors ${noteViewMode === 'preview' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-200 text-gray-500'}`}
+                                            title={noteViewMode === 'edit' ? "Visualizar Markdown" : "Editar Texto"}
+                                        >
+                                            <Icon name={noteViewMode === 'edit' ? "fileText" : "edit2"} size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                                {noteViewMode === 'edit' ? (
+                                    <textarea 
+                                        className="flex-1 p-6 w-full resize-none focus:outline-none text-gray-700 font-mono text-sm leading-relaxed" 
+                                        value={currentItem.content || ''} 
+                                        onChange={(e) => updateNoteContent(currentItem.id, e.target.value)} 
+                                        placeholder="Digite seu texto em Markdown..."
+                                    ></textarea>
+                                ) : (
+                                    <div 
+                                        className="flex-1 p-8 overflow-y-auto custom-scroll markdown-preview bg-white"
+                                        dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(currentItem.content || '') : currentItem.content }}
+                                    ></div>
+                                )}
+                            </div>
+                        ) : currentItem.type === 'report' ? (
+                            <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
+                                <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0">
+                                    <div className="flex items-center gap-2 font-semibold text-gray-700">
+                                        <Icon name="activity" size={18} className="text-orange-500" />
+                                        {currentItem.name}
+                                    </div>
+                                    <span className="text-xs text-gray-400">Relatório Automático</span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-6 custom-scroll bg-gray-50">
+                                    {(() => {
+                                        const getDescendantIds = (rootId) => {
+                                            let ids = [rootId];
+                                            const children = items.filter(i => i.type === 'folder' && i.parentId === rootId);
+                                            children.forEach(c => ids = ids.concat(getDescendantIds(c.id)));
+                                            return ids;
+                                        };
+                                        const contextIds = currentItem.parentId ? getDescendantIds(currentItem.parentId) : null;
+                                        const contextItems = contextIds ? items.filter(i => contextIds.includes(i.parentId)) : items;
+
+                                        const editais = contextItems.filter(i => i.type === 'edital');
+                                        let totalTopics = 0, totalLido = 0, totalRevisado = 0;
+                                        editais.forEach(ed => {
+                                            try {
+                                                const data = JSON.parse(ed.content);
+                                                data.disciplinas?.forEach(d => d.itens?.forEach(i => {
+                                                    totalTopics++;
+                                                    const p = ed.progressMap?.[d.id]?.[i.path];
+                                                    const isLido = typeof p === 'boolean' ? p : (p?.lido || false);
+                                                    const isRevisado = typeof p === 'object' ? (p?.revisado || false) : false;
+                                                    if (isLido) totalLido++;
+                                                    if (isRevisado) totalRevisado++;
+                                                }));
+                                            } catch(e) {}
+                                        });
+                                        const pctLido = totalTopics > 0 ? Math.round((totalLido/totalTopics)*100) : 0;
+                                        const pctRevisado = totalTopics > 0 ? Math.round((totalRevisado/totalTopics)*100) : 0;
+
+                                        const counts = contextItems.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0) + 1; return acc; }, {});
+
+                                        const topViewed = contextItems
+                                            .filter(i => i.type !== 'folder' && (i.views || 0) > 0)
+                                            .sort((a,b) => (b.views || 0) - (a.views || 0))
+                                            .slice(0, 10);
+
+                                        const timeStatsRaw = safeLocalStorage.getItem(TIME_STATS_KEY);
+                                        const timeStats = timeStatsRaw ? JSON.parse(timeStatsRaw) : { totalMinutes: 0, days: [] };
+                                        const hours = Math.floor(timeStats.totalMinutes / 60);
+                                        const days = Math.floor(hours / 24);
+                                        const remainingHours = hours % 24;
+                                        const minutes = timeStats.totalMinutes % 60;
+                                        const avgMinutes = timeStats.days.length > 0 ? Math.round(timeStats.totalMinutes / timeStats.days.length) : 0;
+                                        const avgHours = (avgMinutes / 60).toFixed(1);
+
+                                        return (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 col-span-1 md:col-span-2">
+                                                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Icon name="list" size={20} className="text-green-500"/> Progresso Geral dos Editais</h3>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+                                                            <span className="text-sm text-green-600 block mb-1">Conteúdo Lido</span>
+                                                            <div className="text-3xl font-bold text-green-800">{pctLido}%</div>
+                                                            <div className="w-full bg-green-200 h-2 rounded-full mt-2"><div className="bg-green-600 h-2 rounded-full transition-all" style={{width: `${pctLido}%`}}></div></div>
+                                                            <p className="text-xs text-green-600 mt-2">{totalLido} de {totalTopics} tópicos</p>
+                                                        </div>
+                                                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                                                            <span className="text-sm text-purple-600 block mb-1">Conteúdo Revisado</span>
+                                                            <div className="text-3xl font-bold text-purple-800">{pctRevisado}%</div>
+                                                            <div className="w-full bg-purple-200 h-2 rounded-full mt-2"><div className="bg-purple-600 h-2 rounded-full transition-all" style={{width: `${pctRevisado}%`}}></div></div>
+                                                            <p className="text-xs text-purple-600 mt-2">{totalRevisado} de {totalTopics} tópicos</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Icon name="clock" size={20} className="text-blue-500"/> Tempo de Estudo (Global)</h3>
+                                                    <div className="space-y-4">
+                                                        <div>
+                                                            <span className="text-gray-500 text-sm">Tempo Total</span>
+                                                            <div className="text-2xl font-mono text-gray-800">{days}d {remainingHours}h {minutes}m</div>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-gray-500 text-sm">Média Diária</span>
+                                                            <div className="text-2xl font-mono text-gray-800">{avgHours} horas/dia</div>
+                                                            <p className="text-xs text-gray-400">Baseado em {timeStats.days.length} dias ativos</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Icon name="database" size={20} className="text-gray-500"/> Arquivos na Pasta</h3>
+                                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                                        <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Flashcards</span> <span className="font-bold">{counts.deck||0}</span></div>
+                                                        <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Notas</span> <span className="font-bold">{counts.note||0}</span></div>
+                                                        <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Editais</span> <span className="font-bold">{counts.edital||0}</span></div>
+                                                        <div className="flex justify-between p-2 bg-gray-50 rounded"><span>PDFs</span> <span className="font-bold">{counts.pdf||0}</span></div>
+                                                        <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Vídeos</span> <span className="font-bold">{counts.video||0}</span></div>
+                                                        <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Imagens</span> <span className="font-bold">{counts.image||0}</span></div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 col-span-1 md:col-span-2">
+                                                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Icon name="trophy" size={20} className="text-yellow-500"/> Top 10 Mais Visualizados</h3>
+                                                    {topViewed.length === 0 ? (
+                                                        <p className="text-gray-400 text-sm italic">Nenhum arquivo visualizado ainda nesta pasta.</p>
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            {topViewed.map((item, idx) => (
+                                                                <div 
+                                                                    key={item.id} 
+                                                                    onClick={() => handleItemClick(item)}
+                                                                    className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group border border-transparent hover:border-gray-200"
+                                                                >
+                                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                                        <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${idx < 3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>{idx + 1}</span>
+                                                                        <div className="truncate">
+                                                                            <p className="font-medium text-gray-700 group-hover:text-blue-600 truncate">{item.name}</p>
+                                                                            <p className="text-[10px] text-gray-400 uppercase">{item.type}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1 text-gray-400 text-xs">
+                                                                        <Icon name="play" size={12} /> {item.views}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        ) : currentItem.type === 'edital' ? (
                             <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
                                 <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0">
                                     <div className="flex items-center gap-2 font-semibold text-gray-700">
@@ -778,11 +1127,28 @@
                                         {currentItem.name}
                                     </div>
                                     <div className="flex gap-2">
+                                        {(() => {
+                                            let total = 0;
+                                            let lidoCount = 0;
+                                            try {
+                                                const data = JSON.parse(currentItem.content);
+                                                data.disciplinas?.forEach(d => {
+                                                    d.itens?.forEach(i => {
+                                                        total++;
+                                                        const p = currentItem.progressMap?.[d.id]?.[i.path];
+                                                        const isLido = typeof p === 'boolean' ? p : (p?.lido || false);
+                                                        if (isLido) lidoCount++;
+                                                    });
+                                                });
+                                            } catch(e) {}
+                                            const pct = total > 0 ? Math.round((lidoCount/total)*100) : 0;
+                                            return <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold self-center">{pct}% Lido</span>;
+                                        })()}
                                         <button onClick={() => {
                                             const isEditing = currentItem.isEditing;
                                             setItems(prev => prev.map(i => i.id === currentItem.id ? { ...i, isEditing: !isEditing } : i));
                                         }} className="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded font-medium transition-colors">
-                                            {currentItem.isEditing ? "Ver Checkbox" : "Editar JSON"}
+                                            {currentItem.isEditing ? "Ver Checklist" : "Editar JSON"}
                                         </button>
                                         <span className="text-xs text-gray-400 self-center">Edital</span>
                                     </div>
@@ -805,32 +1171,51 @@
                                                         {data.disciplinas.map(disc => (
                                                             <div key={disc.id} className="border-l-4 border-blue-500 pl-4">
                                                                 <h2 className="text-xl font-bold text-gray-800 mb-4">{disc.titulo}</h2>
-                                                                <div className="space-y-4">
+                                                                <div className="space-y-2">
                                                                     {disc.itens.map(item => {
-                                                                        const isChecked = currentItem.progressMap?.[disc.id]?.[item.path] || false;
+                                                                        const progress = currentItem.progressMap?.[disc.id]?.[item.path] || {};
+                                                                        const isLido = typeof progress === 'boolean' ? progress : (progress.lido || false);
+                                                                        const isRevisado = typeof progress === 'object' ? (progress.revisado || false) : false;
+                                                                        const isFacil = typeof progress === 'object' ? (progress.facil || false) : false;
+                                                                        const isDificil = typeof progress === 'object' ? (progress.dificil || false) : false;
+
                                                                         return (
-                                                                            <div key={item.path} className="group">
-                                                                                <div className="flex items-start gap-3">
-                                                                                    <div className="pt-1">
-                                                                                        <input 
-                                                                                            type="checkbox" 
-                                                                                            checked={isChecked}
-                                                                                            onChange={(e) => updateEditalProgress(currentItem.id, disc.id, item.path, e.target.checked)}
-                                                                                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                                                                        />
+                                                                            <div key={item.path} className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 py-3 border-b border-gray-100 last:border-0 group">
+                                                                                <div className="flex-1 min-w-0">
+                                                                                    <h3 className={`font-semibold text-gray-800 break-words ${isLido ? 'text-gray-500' : ''}`}>
+                                                                                        {item.path}. {item.titulo}
+                                                                                    </h3>
+                                                                                    <div 
+                                                                                        className="text-sm text-gray-600 mt-1 cursor-pointer hover:text-blue-600 hover:bg-blue-50 p-1 -ml-1 rounded transition-colors inline-block"
+                                                                                        onClick={() => handleSmartSearch(disc.titulo, item.aula)}
+                                                                                        title="Clique para buscar este conteúdo no Explorer"
+                                                                                    >
+                                                                                        <span className="font-bold text-blue-600">({item.aula})</span> - {item.descricao}
                                                                                     </div>
-                                                                                    <div className="flex-1">
-                                                                                        <h3 className={`font-semibold text-gray-800 ${isChecked ? 'line-through text-gray-400' : ''}`}>
-                                                                                            {item.path}. {item.titulo}
-                                                                                        </h3>
-                                                                                        <div 
-                                                                                            className="text-sm text-gray-600 mt-1 cursor-pointer hover:text-blue-600 hover:bg-blue-50 p-1 -ml-1 rounded transition-colors inline-block"
-                                                                                            onClick={() => handleSmartSearch(disc.titulo, item.aula)}
-                                                                                            title="Clique para buscar este conteúdo no Explorer"
-                                                                                        >
-                                                                                            <span className="font-bold text-blue-600">({item.aula})</span> - {item.descricao}
-                                                                                        </div>
-                                                                                    </div>
+                                                                                </div>
+                                                                                
+                                                                                <div className="flex gap-2 shrink-0 self-start sm:self-center bg-gray-50 p-2 rounded-lg">
+                                                                                    {[
+                                                                                        { id: 'lido', label: 'Lido', color: 'blue' },
+                                                                                        { id: 'revisado', label: 'Revisado', color: 'purple' },
+                                                                                        { id: 'facil', label: 'Fácil', color: 'green' },
+                                                                                        { id: 'dificil', label: 'Difícil', color: 'red' }
+                                                                                    ].map(btn => {
+                                                                                        const checked = btn.id === 'lido' ? isLido : btn.id === 'revisado' ? isRevisado : btn.id === 'facil' ? isFacil : isDificil;
+                                                                                        return (
+                                                                                            <button
+                                                                                                key={btn.id}
+                                                                                                onClick={() => updateEditalProgress(currentItem.id, disc.id, item.path, btn.id, !checked)}
+                                                                                                className={`flex flex-col items-center justify-center p-1 rounded transition-all w-12 h-12 border ${checked ? `bg-${btn.color}-50 border-${btn.color}-500 text-${btn.color}-600` : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'}`}
+                                                                                                title={btn.label}
+                                                                                            >
+                                                                                                <span className="text-[9px] font-bold uppercase mb-1 leading-none">{btn.label.substr(0,4)}</span>
+                                                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center ${checked ? `bg-${btn.color}-500 border-${btn.color}-500` : 'border-gray-300'}`}>
+                                                                                                    {checked && <Icon name="check" size={10} className="text-white" />}
+                                                                                                </div>
+                                                                                            </button>
+                                                                                        );
+                                                                                    })}
                                                                                 </div>
                                                                             </div>
                                                                         );
@@ -847,8 +1232,8 @@
                                     </div>
                                 )}
                             </div>
-                        ) : currentItem.type === 'pdf' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="file-text" size={18} className="text-red-500" />{currentItem.name}</div><span className="text-xs text-gray-400">PDF Local</span></div>{pdfUrl ? (<iframe src={`PDF%20LEITOR.html?id=${currentItem.id}`} className="w-full h-full border-none" title="PDF Viewer"></iframe>) : pdfMissing ? (<div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-500 space-y-4"><Icon name="fileText" size={48} className="text-gray-300" /><div><h3 className="font-bold text-gray-700">Arquivo não encontrado</h3><p className="text-xs mt-1">O PDF <b>{currentItem.name}.pdf</b> é local.</p></div><button onClick={() => restorePdfRef.current.click()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors">Localizar PDF</button><input ref={restorePdfRef} type="file" accept=".pdf" onChange={handlePdfRestore} className="hidden" /></div>) : (<div className="flex-1 flex items-center justify-center text-gray-400">Carregando...</div>)}</div>) : currentItem.type === 'video' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="video" size={18} className="text-pink-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Vídeo Link</span></div><div className="flex-1 bg-black relative"><iframe src={getEmbedUrl(currentItem.content)} className="absolute inset-0 w-full h-full border-none" title={currentItem.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div></div>) : currentItem.type === 'image' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="image" size={18} className="text-purple-500" />{currentItem.name}</div><div className="flex items-center gap-2"><span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{getHostname(currentItem.content)}</span><span className="text-xs text-gray-400">Imagem Web</span></div></div><div className="flex-1 bg-gray-100 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing" onMouseDown={handleImageMouseDown} onMouseMove={handleImageMouseMove} onMouseUp={handleImageMouseUp} onMouseLeave={handleImageMouseUp}><div className="absolute top-4 right-4 z-10 flex gap-2 bg-white/80 p-1 rounded-lg shadow backdrop-blur-sm"><button onClick={() => setImageZoom(z => Math.max(0.1, z - 0.1))} className="p-1 hover:bg-gray-200 rounded"><Icon name="minus" size={16}/></button><span className="text-xs w-8 text-center self-center">{Math.round(imageZoom * 100)}%</span><button onClick={() => setImageZoom(z => z + 0.1)} className="p-1 hover:bg-gray-200 rounded"><Icon name="plus" size={16}/></button><button onClick={resetImage} className="p-1 hover:bg-gray-200 rounded text-red-500" title="Resetar"><Icon name="rotateCcw" size={16}/></button></div><div className="w-full h-full flex items-center justify-center pointer-events-none"><img src={currentItem.content} alt={currentItem.name} style={{ transform: `translate(${imagePos.x}px, ${imagePos.y}px) scale(${imageZoom})`, transformOrigin: 'center', transition: isDraggingImage ? 'none' : 'transform 0.2s ease-out', cursor: isDraggingImage ? 'grabbing' : 'grab' }} className="max-w-full max-h-full object-contain pointer-events-auto" draggable="false" onError={(e) => {e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x300?text=Erro+ao+carregar+imagem'}} /></div></div></div>) : (<div className="w-full max-w-5xl flex-1 flex flex-col items-center my-auto"><div className="flex items-center justify-center w-full gap-4 md:gap-8"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronLeft" size={32} /></button><div className="perspective-1000 w-full max-w-2xl h-[350px] md:h-[500px] cursor-pointer group relative" onClick={handleFlip}><div className={`relative w-full h-full text-center transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}><div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden" style={{ backgroundColor: theme.frontBg, color: theme.frontText }}><div className="h-2 w-full" style={{ backgroundColor: `${theme.progressColor}33` }}><div className="h-full transition-all duration-300" style={{ width: `${(((currentCardIndex || 0) + 1) / (currentItem.cards?.length || 1)) * 100}%`, backgroundColor: theme.progressColor }}></div></div><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><div className="flex justify-between items-center w-full opacity-50"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded">Pergunta</span><span className="text-xs font-mono">{currentCardIndex + 1}/{currentItem.cards?.length || 0}</span></div><h2 className="text-2xl md:text-3xl font-semibold leading-snug">{currentCard ? currentCard.front : ""}</h2></div></div><div className="p-4 text-xs font-medium border-t border-black/5 opacity-50">Toque para virar</div></div><div className="absolute w-full h-full backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-700 overflow-hidden" style={{ backgroundColor: theme.backBg, color: theme.backText }}><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded self-center opacity-60">Resposta</span><p className="text-xl md:text-2xl font-light leading-relaxed whitespace-pre-wrap">{currentCard ? currentCard.back : ""}</p>{currentCard && (<button onClick={(e) => { e.stopPropagation(); const q = encodeURIComponent(`${currentCard.front} ${currentCard.back} explicar detalhadamente`).replace(/%20/g, '+'); window.open(`https://www.google.com/search?udm=50&aep=11&q=${q}`, '_blank'); }} className="mt-4 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-current opacity-60 hover:opacity-100 hover:bg-white/10 transition-all self-center"><Icon name="search" size={14} /> Saber mais</button>)}</div></div><div className="p-4 text-xs font-medium border-t border-white/10 opacity-50">Próximo...</div></div></div></div><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronRight" size={32} /></button></div><div className="flex md:hidden items-center justify-between w-full max-w-2xl mt-6 gap-4"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronLeft" size={24} /></button><button onClick={(e) => { e.stopPropagation(); handleFlip(); }} className="flex-1 py-4 text-white rounded-xl shadow font-semibold flex justify-center items-center gap-2" style={{ backgroundColor: theme.progressColor }}><Icon name="rotateCw" size={20} /> Virar</button><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronRight" size={24} /></button></div></div>)}</div></div>
-                        <div className={`fixed inset-0 z-40 bg-white flex flex-col transition-transform duration-300 md:relative md:translate-x-0 md:border-l border-gray-200 md:order-2 h-full ${showQueue ? 'translate-x-0' : 'translate-x-full'}`} style={isDesktop ? { width: sidebarWidth } : {}}><div className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-400 z-50 transition-colors" onMouseDown={startResizing} style={{ backgroundColor: isResizing ? '#3b82f6' : 'transparent', touchAction: 'none' }} /><div className="p-4 bg-gray-50 border-b shrink-0 flex flex-col gap-3"><div className="flex justify-between items-center"><h2 className="font-bold text-gray-700 flex items-center gap-2"><Icon name="layers" size={20} /> Explorador</h2><div className="flex gap-1"><button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-200 rounded"><Icon name="settings" size={18}/></button><button onClick={() => setShowStats(true)} className={`p-2 hover:bg-gray-200 rounded ${saveStatus==='saved_cloud'?'text-green-500':''}`}><Icon name="barChart" size={18}/></button><button onClick={() => setShowQueue(false)} className="md:hidden p-2 hover:bg-gray-200 rounded"><Icon name="x" size={20}/></button></div></div><div className="flex items-center gap-1 text-sm overflow-x-auto whitespace-nowrap pb-1 custom-scroll">{searchTerm ? (<div className="flex items-center justify-between w-full"><span className="text-sm font-bold text-blue-600 flex items-center gap-1"><Icon name="search" size={14}/> Busca: "{searchTerm}"</span><button onClick={clearSearch} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button></div>) : activeFilters.length > 0 ? (<div className="flex items-center justify-between w-full"><span className="text-sm font-bold text-purple-600 flex items-center gap-1"><Icon name="filter" size={14}/> Filtro Ativo ({activeFilters.length})</span><button onClick={clearFilters} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button></div>) : (<><button onClick={() => setCurrentFolderId(null)} className={`flex items-center hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${!currentFolderId ? 'font-bold text-blue-700' : 'text-gray-500'}`}><Icon name="home" size={14} className="mr-1"/> Início</button>{breadcrumbs.map((folder, i) => (<React.Fragment key={folder.id}><span className="text-gray-300">/</span><button onClick={() => setCurrentFolderId(folder.id)} className={`hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${i === breadcrumbs.length - 1 ? 'font-bold text-blue-700' : 'text-gray-500'}`}>{folder.name}</button></React.Fragment>))}</>)}</div></div><div className="flex-1 overflow-y-auto p-2 space-y-1">{!activeFilters.length && !searchTerm && currentFolderId && (<button onClick={() => { const curr = items.find(i => i.id === currentFolderId); setCurrentFolderId(curr ? curr.parentId : null); }} className="w-full text-left p-2 hover:bg-gray-100 rounded text-gray-500 text-sm flex items-center gap-2 mb-2"><Icon name="cornerUpLeft" size={16} /> .. Voltar</button>)}{currentFolderItems.map(item => (<div key={item.id} className={`group relative p-2 rounded-lg border transition-all cursor-pointer select-none grid grid-cols-[auto_1fr_auto] gap-3 items-center ${item.id === activeDeckId ? 'bg-blue-50 border-blue-300 shadow-sm ring-1 ring-blue-200' : 'bg-white border-gray-100 hover:border-gray-300 hover:bg-gray-50'}`} onClick={() => { if (item.type === 'folder') { setCurrentFolderId(item.id); setSearchTerm(""); } else selectDeck(item.id); }}><div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.type === 'folder' ? 'bg-yellow-100 text-yellow-600' : item.type === 'note' ? 'bg-indigo-100 text-indigo-600' : item.type === 'pdf' ? 'bg-red-100 text-red-600' : item.type === 'video' ? 'bg-pink-100 text-pink-600' : item.type === 'image' ? 'bg-purple-100 text-purple-600' : item.type === 'edital' ? 'bg-green-100 text-green-600' : (item.id === activeDeckId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500')}`}><Icon name={item.type === 'folder' ? 'folder' : item.type === 'note' ? 'fileText' : item.type === 'pdf' ? 'fileText' : item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : item.type === 'edital' ? 'list' : 'play'} size={14} className={item.id === activeDeckId ? "ml-0.5" : ""} /></div><div className="min-w-0">{editingItemId === item.id ? (<div className="flex items-center gap-1" onClick={e => e.stopPropagation()}><input ref={editInputRef} value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => { if(e.key==='Enter') saveRename(e); if(e.key==='Escape') setEditingItemId(null); }} className="w-full text-sm border rounded px-1 py-0.5 focus:border-blue-500 outline-none" /><button onClick={saveRename} className="text-green-600 p-1"><Icon name="check" size={14}/></button></div>) : (<div><p className={`text-sm font-medium truncate ${item.id === activeDeckId ? 'text-blue-900' : 'text-gray-700'}`}>{item.name}</p><div className="flex items-center gap-2 mt-0.5">{item.type === 'folder' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{countItemsInFolder(item.id)} itens</span> : item.type === 'note' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">Nota</span> : item.type === 'pdf' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">PDF Local</span> : item.type === 'video' ? <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 rounded-full">Vídeo</span> : item.type === 'image' ? <><span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 rounded-full">Imagem</span><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full max-w-[80px] truncate">{getHostname(item.content)}</span></> : item.type === 'edital' ? <span className="text-[10px] bg-green-100 text-green-600 px-1.5 rounded-full">Edital/Checklist</span> : <><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{Math.round(((item.progress || 0) / (item.cards?.length || 1)) * 100)}%</span>{item.completions > 0 && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 rounded-full flex items-center gap-1 font-bold"><Icon name="trophy" size={8} /> {item.completions}</span>}</>}</div></div>)}</div>{editingItemId !== item.id && (<div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><div className="flex items-center gap-1 mr-2"><button onClick={(e) => downloadItem(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Baixar"><Icon name="download" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'copy')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Copiar"><Icon name="copy" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'cut')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-orange-600 rounded" title="Recortar"><Icon name="scissors" size={14} /></button><button onClick={(e) => startRenaming(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-green-600 rounded" title="Renomear"><Icon name="edit2" size={14} /></button><button onClick={(e) => deleteItem(e, item.id)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-red-600 rounded" title="Excluir"><Icon name="trash2" size={14} /></button></div></div>)}</div>))}{currentFolderItems.length === 0 && (<div className="text-center text-gray-400 py-8 text-sm italic">{searchTerm ? "Nenhum resultado para a busca." : activeFilters.length > 0 ? "Nenhum arquivo encontrado." : "Pasta vazia"}</div>)}</div><div className="p-4 bg-gray-50 border-t shrink-0 flex flex-col gap-2">{clipboard ? (<div className="flex gap-2 w-full"><button onClick={pasteItems} className="flex-1 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-medium flex items-center justify-center gap-2 border border-orange-200 animate-pulse"><Icon name="clipboard" size={16} /> Colar {clipboard.items.length} item(s) ({clipboard.mode === 'cut' ? 'Recortado' : 'Copiado'})</button><button onClick={cancelClipboard} className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded-lg"><Icon name="x" size={16} /></button></div>) : (<div className="flex gap-2"><div className="relative flex-1"><button onClick={() => setShowNewMenu(!showNewMenu)} className="w-full py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="plus" size={16} /> Novo</button>{showNewMenu && (<div className="absolute bottom-full left-0 w-full mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200"><button onClick={createFolder} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 border-b border-gray-50"><Icon name="folderPlus" size={16} className="text-yellow-500"/> Pasta</button><button onClick={createNote} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="fileText" size={16} className="text-indigo-500"/> Nota (Texto)</button><button onClick={createEdital} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="list" size={16} className="text-green-500"/> Edital (JSON/Checklist)</button><button onClick={createVideo} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="video" size={16} className="text-pink-500"/> Vídeo (Iframe)</button><button onClick={createImage} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="image" size={16} className="text-purple-500"/> Imagem (URL)</button></div>)}</div><button onClick={() => fileInputRef.current.click()} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="filePlus" size={16} /> Importar</button><div className="relative"><button onClick={() => setShowFilterMenu(!showFilterMenu)} className={`h-full px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors ${activeFilters.length > 0 ? 'bg-purple-50 text-purple-600 border-purple-200 ring-1 ring-purple-200' : ''}`} title="Filtrar"><Icon name="filter" size={16} /></button>{showFilterMenu && (<div className="absolute bottom-full right-0 w-48 mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200 z-50"><div className="p-3 border-b bg-gray-50 text-xs font-bold text-gray-500 uppercase">Filtrar por Tipo</div><div className="p-2 space-y-1">{[{id: 'deck', label: 'Flashcards', color: 'bg-blue-500'},{id: 'note', label: 'Notas', color: 'bg-indigo-500'},{id: 'edital', label: 'Editais', color: 'bg-green-500'},{id: 'pdf', label: 'PDF', color: 'bg-red-500'},{id: 'video', label: 'Vídeo', color: 'bg-pink-500'},{id: 'image', label: 'Imagem', color: 'bg-purple-500'}].map(type => (<button key={type.id} onClick={() => toggleFilter(type.id)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${activeFilters.includes(type.id) ? 'bg-gray-100 font-medium text-gray-900' : 'hover:bg-gray-50 text-gray-600'}`}><span className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${type.color}`}></span>{type.label}</span>{activeFilters.includes(type.id) && <Icon name="check" size={14} className="text-green-600"/>}</button>))}</div>{activeFilters.length > 0 && <div className="p-2 border-t bg-gray-50"><button onClick={clearFilters} className="w-full py-1.5 text-xs text-red-600 hover:bg-red-50 rounded font-medium">Limpar Filtros</button></div>}</div>)}</div></div>)}<input type="file" accept=".csv, .txt, .pdf" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" /></div></div>
+                        ) : currentItem.type === 'pdf' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="fileText" size={18} className="text-red-500" />{currentItem.name}</div><span className="text-xs text-gray-400">PDF Local</span></div>{pdfUrl ? (<iframe src={`PDF%20LEITOR.html?id=${currentItem.id}`} className="w-full h-full border-none" title="PDF Viewer"></iframe>) : pdfMissing ? (<div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-500 space-y-4"><Icon name="fileText" size={48} className="text-gray-300" /><div><h3 className="font-bold text-gray-700">Arquivo não encontrado</h3><p className="text-xs mt-1">O PDF <b>{currentItem.name}.pdf</b> é local.</p></div><button onClick={() => restorePdfRef.current.click()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors">Localizar PDF</button><input ref={restorePdfRef} type="file" accept=".pdf" onChange={handlePdfRestore} className="hidden" /></div>) : (<div className="flex-1 flex items-center justify-center text-gray-400">Carregando...</div>)}</div>) : currentItem.type === 'video' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="video" size={18} className="text-pink-500" />{currentItem.name}</div><span className="text-xs text-gray-400">Vídeo Link</span></div><div className="flex-1 bg-black relative"><iframe src={getEmbedUrl(currentItem.content)} className="absolute inset-0 w-full h-full border-none" title={currentItem.name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div></div>) : currentItem.type === 'image' ? (<div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0"><div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0"><div className="flex items-center gap-2 font-semibold text-gray-700"><Icon name="image" size={18} className="text-purple-500" />{currentItem.name}</div><div className="flex items-center gap-2"><span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{getHostname(currentItem.content)}</span><span className="text-xs text-gray-400">Imagem Web</span></div></div><div className="flex-1 bg-gray-100 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing" onMouseDown={handleImageMouseDown} onMouseMove={handleImageMouseMove} onMouseUp={handleImageMouseUp} onMouseLeave={handleImageMouseUp}><div className="absolute top-4 right-4 z-10 flex gap-2 bg-white/80 p-1 rounded-lg shadow backdrop-blur-sm"><button onClick={() => setImageZoom(z => Math.max(0.1, z - 0.1))} className="p-1 hover:bg-gray-200 rounded"><Icon name="minus" size={16}/></button><span className="text-xs w-8 text-center self-center">{Math.round(imageZoom * 100)}%</span><button onClick={() => setImageZoom(z => z + 0.1)} className="p-1 hover:bg-gray-200 rounded"><Icon name="plus" size={16}/></button><button onClick={resetImage} className="p-1 hover:bg-gray-200 rounded text-red-500" title="Resetar"><Icon name="rotateCcw" size={16}/></button></div><div className="w-full h-full flex items-center justify-center pointer-events-none"><img src={currentItem.content} alt={currentItem.name} style={{ transform: `translate(${imagePos.x}px, ${imagePos.y}px) scale(${imageZoom})`, transformOrigin: 'center', transition: isDraggingImage ? 'none' : 'transform 0.2s ease-out', cursor: isDraggingImage ? 'grabbing' : 'grab' }} className="max-w-full max-h-full object-contain pointer-events-auto" draggable="false" onError={(e) => {e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x300?text=Erro+ao+carregar+imagem'}} /></div></div></div>) : (<div className="w-full max-w-5xl flex-1 flex flex-col items-center my-auto"><div className="flex items-center justify-center w-full gap-4 md:gap-8"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronLeft" size={32} /></button><div className="perspective-1000 w-full max-w-2xl h-[350px] md:h-[500px] cursor-pointer group relative" onClick={handleFlip}><div className={`relative w-full h-full text-center transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}><div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden" style={{ backgroundColor: theme.frontBg, color: theme.frontText }}><div className="h-2 w-full" style={{ backgroundColor: `${theme.progressColor}33` }}><div className="h-full transition-all duration-300" style={{ width: `${(((currentCardIndex || 0) + 1) / (currentItem.cards?.length || 1)) * 100}%`, backgroundColor: theme.progressColor }}></div></div><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><div className="flex justify-between items-center w-full opacity-50"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded">Pergunta</span><span className="text-xs font-mono">{currentCardIndex + 1}/{currentItem.cards?.length || 0}</span></div><h2 className="text-2xl md:text-3xl font-semibold leading-snug">{currentCard ? currentCard.front : ""}</h2></div></div><div className="p-4 text-xs font-medium border-t border-black/5 opacity-50">Toque para virar</div></div><div className="absolute w-full h-full backface-hidden rotate-y-180 bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-700 overflow-hidden" style={{ backgroundColor: theme.backBg, color: theme.backText }}><div className="flex-1 flex items-center justify-center p-8 overflow-y-auto custom-scroll"><div className="flex flex-col gap-6 w-full"><span className="uppercase text-xs font-bold py-1 px-2 border border-current rounded self-center opacity-60">Resposta</span><p className="text-xl md:text-2xl font-light leading-relaxed whitespace-pre-wrap">{currentCard ? currentCard.back : ""}</p>{currentCard && (<button onClick={(e) => { e.stopPropagation(); const q = encodeURIComponent(`${currentCard.front} ${currentCard.back} explicar detalhadamente`).replace(/%20/g, '+'); window.open(`https://www.google.com/search?udm=50&aep=11&q=${q}`, '_blank'); }} className="mt-4 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-medium border border-current opacity-60 hover:opacity-100 hover:bg-white/10 transition-all self-center"><Icon name="search" size={14} /> Saber mais</button>)}</div></div><div className="p-4 text-xs font-medium border-t border-white/10 opacity-50">Próximo...</div></div></div></div><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="hidden md:flex p-4 rounded-full bg-white text-gray-700 hover:text-blue-600 shadow-lg border transition-all active:scale-95"><Icon name="chevronRight" size={32} /></button></div><div className="flex md:hidden items-center justify-between w-full max-w-2xl mt-6 gap-4"><button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronLeft" size={24} /></button><button onClick={(e) => { e.stopPropagation(); handleFlip(); }} className="flex-1 py-4 text-white rounded-xl shadow font-semibold flex justify-center items-center gap-2" style={{ backgroundColor: theme.progressColor }}><Icon name="rotateCw" size={20} /> Virar</button><button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="p-4 bg-white rounded-full shadow text-gray-700"><Icon name="chevronRight" size={24} /></button></div></div>)}</div></div>
+                        <div className={`fixed inset-0 z-40 bg-white flex flex-col transition-transform duration-300 md:relative md:translate-x-0 md:border-l border-gray-200 md:order-2 h-full ${showQueue ? 'translate-x-0' : 'translate-x-full'}`} style={isDesktop ? { width: sidebarWidth } : {}}><div className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-400 z-50 transition-colors" onMouseDown={startResizing} style={{ backgroundColor: isResizing ? '#3b82f6' : 'transparent', touchAction: 'none' }} /><div className="p-4 bg-gray-50 border-b shrink-0 flex flex-col gap-3"><div className="flex justify-between items-center"><h2 className="font-bold text-gray-700 flex items-center gap-2"><Icon name="layers" size={20} /> Explorador</h2><div className="flex gap-1"><button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-200 rounded"><Icon name="settings" size={18}/></button><button onClick={() => setShowStats(true)} className={`p-2 hover:bg-gray-200 rounded ${saveStatus==='saved_cloud'?'text-green-500':''}`}><Icon name="barChart" size={18}/></button><button onClick={() => setShowQueue(false)} className="md:hidden p-2 hover:bg-gray-200 rounded"><Icon name="x" size={20}/></button></div></div><div className="flex items-center gap-1 text-sm overflow-x-auto whitespace-nowrap pb-1 custom-scroll">{searchTerm ? (<div className="flex items-center justify-between w-full"><span className="text-sm font-bold text-blue-600 flex items-center gap-1"><Icon name="search" size={14}/> Busca: "{searchTerm}"</span><button onClick={clearSearch} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button></div>) : activeFilters.length > 0 ? (<div className="flex items-center justify-between w-full"><span className="text-sm font-bold text-purple-600 flex items-center gap-1"><Icon name="filter" size={14}/> Filtro Ativo ({activeFilters.length})</span><button onClick={clearFilters} className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"><Icon name="x" size={12}/> Limpar</button></div>) : (<><button onClick={() => setCurrentFolderId(null)} className={`flex items-center hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${!currentFolderId ? 'font-bold text-blue-700' : 'text-gray-500'}`}><Icon name="home" size={14} className="mr-1"/> Início</button>{breadcrumbs.map((folder, i) => (<React.Fragment key={folder.id}><span className="text-gray-300">/</span><button onClick={() => setCurrentFolderId(folder.id)} className={`hover:bg-blue-100 px-1.5 py-0.5 rounded transition-colors ${i === breadcrumbs.length - 1 ? 'font-bold text-blue-700' : 'text-gray-500'}`}>{folder.name}</button></React.Fragment>))}</>)}</div></div><div className="flex-1 overflow-y-auto p-2 space-y-1">{!activeFilters.length && !searchTerm && currentFolderId && (<button onClick={() => { const curr = items.find(i => i.id === currentFolderId); setCurrentFolderId(curr ? curr.parentId : null); }} className="w-full text-left p-2 hover:bg-gray-100 rounded text-gray-500 text-sm flex items-center gap-2 mb-2"><Icon name="cornerUpLeft" size={16} /> .. Voltar</button>)}{currentFolderItems.map(item => (<div key={item.id} className={`group relative p-2 rounded-lg border transition-all cursor-pointer select-none grid grid-cols-[auto_1fr_auto] gap-3 items-center ${item.id === activeDeckId ? 'bg-blue-50 border-blue-300 shadow-sm ring-1 ring-blue-200' : 'bg-white border-gray-100 hover:border-gray-300 hover:bg-gray-50'}`} onClick={() => handleItemClick(item)}><div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.type === 'folder' ? 'bg-yellow-100 text-yellow-600' : item.type === 'note' ? 'bg-indigo-100 text-indigo-600' : item.type === 'pdf' ? 'bg-red-100 text-red-600' : item.type === 'video' ? 'bg-pink-100 text-pink-600' : item.type === 'image' ? 'bg-purple-100 text-purple-600' : item.type === 'edital' ? 'bg-green-100 text-green-600' : item.type === 'report' ? 'bg-orange-100 text-orange-600' : (item.id === activeDeckId ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500')}`}><Icon name={item.type === 'folder' ? 'folder' : item.type === 'note' ? 'fileText' : item.type === 'pdf' ? 'fileText' : item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : item.type === 'edital' ? 'list' : item.type === 'report' ? 'activity' : 'play'} size={14} className={item.id === activeDeckId ? "ml-0.5" : ""} /></div><div className="min-w-0">{editingItemId === item.id ? (<div className="flex items-center gap-1" onClick={e => e.stopPropagation()}><input ref={editInputRef} value={tempName} onChange={e => setTempName(e.target.value)} onKeyDown={e => { if(e.key==='Enter') saveRename(e); if(e.key==='Escape') setEditingItemId(null); }} className="w-full text-sm border rounded px-1 py-0.5 focus:border-blue-500 outline-none" /><button onClick={saveRename} className="text-green-600 p-1"><Icon name="check" size={14}/></button></div>) : (<div><p className={`text-sm font-medium truncate ${item.id === activeDeckId ? 'text-blue-900' : 'text-gray-700'}`}>{item.name}</p><div className="flex items-center gap-2 mt-0.5">{item.type === 'folder' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{countItemsInFolder(item.id)} itens</span> : item.type === 'note' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">Nota</span> : item.type === 'pdf' ? <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">PDF Local</span> : item.type === 'video' ? <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 rounded-full">Vídeo</span> : item.type === 'image' ? <><span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 rounded-full">Imagem</span><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full max-w-[80px] truncate">{getHostname(item.content)}</span></> : item.type === 'edital' ? <><span className="text-[10px] bg-green-100 text-green-600 px-1.5 rounded-full">Edital</span><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{calculateEditalProgress(item)}%</span></> : item.type === 'report' ? <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 rounded-full">Relatório</span> : <><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{Math.round(((item.progress || 0) / (item.cards?.length || 1)) * 100)}%</span>{item.completions > 0 && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 rounded-full flex items-center gap-1 font-bold"><Icon name="trophy" size={8} /> {item.completions}</span>}</>}</div></div>)}</div>{editingItemId !== item.id && (<div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><div className="flex items-center gap-1 mr-2"><button onClick={(e) => downloadItem(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Baixar"><Icon name="download" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'copy')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-blue-600 rounded" title="Copiar"><Icon name="copy" size={14} /></button><button onClick={(e) => addToClipboard(e, item, 'cut')} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-orange-600 rounded" title="Recortar"><Icon name="scissors" size={14} /></button><button onClick={(e) => startRenaming(e, item)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-green-600 rounded" title="Renomear"><Icon name="edit2" size={14} /></button><button onClick={(e) => deleteItem(e, item.id)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-red-600 rounded" title="Excluir"><Icon name="trash2" size={14} /></button></div></div>)}</div>))}{currentFolderItems.length === 0 && (<div className="text-center text-gray-400 py-8 text-sm italic">{activeFilters.length > 0 ? "Nenhum arquivo encontrado." : "Pasta vazia"}</div>)}</div><div className="p-4 bg-gray-50 border-t shrink-0 flex flex-col gap-2">{clipboard ? (<div className="flex gap-2 w-full"><button onClick={pasteItems} className="flex-1 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-medium flex items-center justify-center gap-2 border border-orange-200 animate-pulse"><Icon name="clipboard" size={16} /> Colar {clipboard.items.length} item(s) ({clipboard.mode === 'cut' ? 'Recortado' : 'Copiado'})</button><button onClick={cancelClipboard} className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded-lg"><Icon name="x" size={16} /></button></div>) : (<div className="flex gap-2"><div className="relative flex-1"><button onClick={() => setShowNewMenu(!showNewMenu)} className="w-full py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="plus" size={16} /> Novo</button>{showNewMenu && (<div className="absolute bottom-full left-0 w-full mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200"><button onClick={createFolder} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 border-b border-gray-50"><Icon name="folderPlus" size={16} className="text-yellow-500"/> Pasta</button><button onClick={createNote} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="fileText" size={16} className="text-indigo-500"/> Nota (Texto)</button><button onClick={createEdital} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="list" size={16} className="text-green-500"/> Edital (JSON/Checklist)</button><button onClick={createReport} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="activity" size={16} className="text-orange-500"/> Relatório (Analytics)</button><button onClick={createVideo} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="video" size={16} className="text-pink-500"/> Vídeo (Iframe)</button><button onClick={createImage} className="text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2"><Icon name="image" size={16} className="text-purple-500"/> Imagem (URL)</button></div>)}</div><button onClick={() => fileInputRef.current.click()} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2"><Icon name="filePlus" size={16} /> Importar</button><div className="relative"><button onClick={() => setShowFilterMenu(!showFilterMenu)} className={`h-full px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg flex items-center justify-center transition-colors ${activeFilters.length > 0 ? 'bg-purple-50 text-purple-600 border-purple-200 ring-1 ring-purple-200' : ''}`} title="Filtrar"><Icon name="filter" size={16} /></button>{showFilterMenu && (<div className="absolute bottom-full right-0 w-48 mb-2 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 fade-in duration-200 z-50"><div className="p-3 border-b bg-gray-50 text-xs font-bold text-gray-500 uppercase">Filtrar por Tipo</div><div className="p-2 space-y-1">{[{id: 'deck', label: 'Flashcards', color: 'bg-blue-500'},{id: 'note', label: 'Notas', color: 'bg-indigo-500'},{id: 'edital', label: 'Editais', color: 'bg-green-500'},{id: 'report', label: 'Relatórios', color: 'bg-orange-500'},{id: 'pdf', label: 'PDF', color: 'bg-red-500'},{id: 'video', label: 'Vídeo', color: 'bg-pink-500'},{id: 'image', label: 'Imagem', color: 'bg-purple-500'}].map(type => (<button key={type.id} onClick={() => toggleFilter(type.id)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${activeFilters.includes(type.id) ? 'bg-gray-100 font-medium text-gray-900' : 'hover:bg-gray-50 text-gray-600'}`}><span className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${type.color}`}></span>{type.label}</span>{activeFilters.includes(type.id) && <Icon name="check" size={14} className="text-green-600"/>}</button>))}</div>{activeFilters.length > 0 && <div className="p-2 border-t bg-gray-50"><button onClick={clearFilters} className="w-full py-1.5 text-xs text-red-600 hover:bg-red-50 rounded font-medium">Limpar Filtros</button></div>}</div>)}</div></div>)}<input type="file" accept=".csv, .txt, .pdf" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" /></div></div>
                     {showSettings && <SettingsModal />}
                     {showStats && <StatsModal />}
                     {showCompletionModal && <CompletionModal />}
