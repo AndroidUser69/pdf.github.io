@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flashcard Flow - Cloud Pro v2.1.9 (Optimized)</title>
+    <title>Flashcard Flow - Cloud Pro v2.2.2 (Detalhe por Edital)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -82,7 +82,7 @@
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
         // --- CONSTANTES ---
-        const APP_VERSION = "2.1.9";
+        const APP_VERSION = "2.2.2";
         const FIREBASE_CONFIG_FIXED = { apiKey: "AIzaSyApOjZZ75TyDD126CyN4kF7dVeoMvAo5dk", authDomain: "estudos-ec4c5.firebaseapp.com", projectId: "estudos-ec4c5", storageBucket: "estudos-ec4c5.firebasestorage.app", messagingSenderId: "152433763794", appId: "1:152433763794:web:31b8b3fc2f2ee7ae4ed40b", measurementId: "G-YVK8REQRF8" };
         const DEFAULT_THEME = { frontBg: '#ffffff', frontText: '#1f2937', backBg: '#0f172a', backText: '#e2e8f0', progressColor: '#3b82f6', headerBg: '#ffffff' };
         
@@ -309,7 +309,7 @@
             const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
             // --- Estados Resize ---
-            const [sidebarWidth, setSidebarWidth] = useState(534); 
+            const [sidebarWidth, setSidebarWidth] = useState(584); 
             const [isResizing, setIsResizing] = useState(false);
             const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
 
@@ -432,12 +432,24 @@
                 if (!user || isGuest || !window.firebaseAppObj) return; 
                 const { db, doc, setDoc, writeBatch, collection, deleteField } = window.firebaseAppObj; 
                 setSaveStatus('saving'); 
+                
+                // Get current time stats to sync
+                const timeStatsRaw = safeLocalStorage.getItem(TIME_STATS_KEY);
+                const timeStats = timeStatsRaw ? JSON.parse(timeStatsRaw) : null;
+
                 try { 
                     const appId = window.firebaseAppObj.config.projectId; 
                     const userRoot = `artifacts/${appId}/users/${user.uid}/data/backup`;
                     const itemsCollectionRef = collection(db, 'artifacts', appId, 'users', user.uid, 'data', 'backup', 'items');
                     const rootRef = doc(db, userRoot);
-                    await setDoc(rootRef, { theme: currTheme, timestamp: Date.now(), appVersion: APP_VERSION, migratedToSubcollection: true, items: deleteField() }, { merge: true });
+                    await setDoc(rootRef, { 
+                        theme: currTheme, 
+                        timeStats: timeStats, // Saving stats to cloud
+                        timestamp: Date.now(), 
+                        appVersion: APP_VERSION, 
+                        migratedToSubcollection: true, 
+                        items: deleteField() 
+                    }, { merge: true });
                     const chunkSize = 450; 
                     for (let i = 0; i < currItems.length; i += chunkSize) {
                         const chunk = currItems.slice(i, i + chunkSize);
@@ -509,10 +521,11 @@
                 try {
                     const ref = doc(dbInstance, 'artifacts', appId, 'users', currentUser.uid, 'data', 'backup');
                     const snap = await getDoc(ref);
-                    let cloudItems = []; let cloudTheme = null; let cloudTime = null;
+                    let cloudItems = []; let cloudTheme = null; let cloudTime = null; let cloudTimeStats = null;
                     if (snap.exists()) {
                         const d = snap.data();
                         cloudTheme = d.theme; cloudTime = d.timestamp;
+                        cloudTimeStats = d.timeStats;
                         const itemsCollectionRef = collection(dbInstance, 'artifacts', appId, 'users', currentUser.uid, 'data', 'backup', 'items');
                         const itemsSnap = await getDocs(itemsCollectionRef);
                         if (!itemsSnap.empty) { cloudItems = itemsSnap.docs.map(doc => doc.data()); } 
@@ -521,6 +534,7 @@
                     if (cloudItems.length > 0 && confirm(`Backup encontrado (${cloudItems.length} itens). Carregar?`)) {
                         setItems(sanitizeItems(cloudItems)); 
                         if (cloudTheme) setTheme(cloudTheme);
+                        if (cloudTimeStats) safeLocalStorage.setItem(TIME_STATS_KEY, JSON.stringify(cloudTimeStats));
                         if (cloudTime) setLastCloudSave(new Date(cloudTime));
                     }
                 } catch (e) { console.error("Erro cloud:", e); }
@@ -536,7 +550,9 @@
                     window.firebaseAppObj = { auth, db, config: FIREBASE_CONFIG_FIXED, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, doc, setDoc, getDoc, collection, writeBatch, getDocs, deleteField, deleteDoc };
                     onAuthStateChanged(auth, (u) => {
                         if (u) { setUser(u); setIsGuest(false); showToast('success', 'Conectado: ' + u.email); loadFromCloud(u, db); } 
-                        else { setUser(null); }
+                        else { setUser(null); 
+                               // Clear stats visually on logout, but keep in local storage until overwrite
+                        }
                     });
                 } catch (e) { console.error("Init fail", e); showToast('error', 'Firebase offline.'); }
             };
@@ -987,6 +1003,7 @@
                                 )}
                             </div>
                         ) : currentItem.type === 'report' ? (
+                            // --- VISUALIZADOR DE RELATÓRIO (ANALYTICS) ---
                             <div className="w-full max-w-5xl flex-1 flex flex-col bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden min-h-0">
                                 <div className="bg-gray-50 border-b p-3 flex justify-between items-center shrink-0">
                                     <div className="flex items-center gap-2 font-semibold text-gray-700">
@@ -997,6 +1014,7 @@
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-6 custom-scroll bg-gray-50">
                                     {(() => {
+                                        // 1. Coleta itens do contexto (pasta atual e subpastas)
                                         const getDescendantIds = (rootId) => {
                                             let ids = [rootId];
                                             const children = items.filter(i => i.type === 'folder' && i.parentId === rootId);
@@ -1006,31 +1024,53 @@
                                         const contextIds = currentItem.parentId ? getDescendantIds(currentItem.parentId) : null;
                                         const contextItems = contextIds ? items.filter(i => contextIds.includes(i.parentId)) : items;
 
+                                        // 2. Cálculos de Editais (Antigo e Novo)
                                         const editais = contextItems.filter(i => i.type === 'edital');
-                                        let totalTopics = 0, totalLido = 0, totalRevisado = 0;
-                                        editais.forEach(ed => {
+                                        
+                                        // NEW LOGIC for detailed edital progress
+                                        const editaisStats = editais.map(ed => {
+                                            let t = 0, l = 0, r = 0;
                                             try {
                                                 const data = JSON.parse(ed.content);
                                                 data.disciplinas?.forEach(d => d.itens?.forEach(i => {
-                                                    totalTopics++;
+                                                    t++;
                                                     const p = ed.progressMap?.[d.id]?.[i.path];
                                                     const isLido = typeof p === 'boolean' ? p : (p?.lido || false);
                                                     const isRevisado = typeof p === 'object' ? (p?.revisado || false) : false;
-                                                    if (isLido) totalLido++;
-                                                    if (isRevisado) totalRevisado++;
+                                                    if (isLido) l++;
+                                                    if (isRevisado) r++;
                                                 }));
                                             } catch(e) {}
+                                            return {
+                                                ...ed,
+                                                stats: { total: t, lido: l, revisado: r, pctLido: t > 0 ? Math.round((l/t)*100) : 0 }
+                                            };
+                                        });
+
+                                        let totalTopics = 0, totalLido = 0, totalRevisado = 0;
+                                        editaisStats.forEach(e => {
+                                            totalTopics += e.stats.total;
+                                            totalLido += e.stats.lido;
+                                            totalRevisado += e.stats.revisado;
                                         });
                                         const pctLido = totalTopics > 0 ? Math.round((totalLido/totalTopics)*100) : 0;
                                         const pctRevisado = totalTopics > 0 ? Math.round((totalRevisado/totalTopics)*100) : 0;
 
+
+                                        // 3. Contagem de Tipos
                                         const counts = contextItems.reduce((acc, i) => { acc[i.type] = (acc[i.type] || 0) + 1; return acc; }, {});
 
+                                        // 4. Top 10 Mais Visualizados
+                                        const excludedTypes = ['folder', 'edital', 'report'];
                                         const topViewed = contextItems
-                                            .filter(i => i.type !== 'folder' && (i.views || 0) > 0)
-                                            .sort((a,b) => (b.views || 0) - (a.views || 0))
+                                             .filter(i =>
+                                                !excludedTypes.includes(i.type) &&
+                                                (i.views || 0) > 0
+                                            )
+                                            .sort((a, b) => (b.views || 0) - (a.views || 0))
                                             .slice(0, 10);
 
+                                        // 5. Tempo Total (Global)
                                         const timeStatsRaw = safeLocalStorage.getItem(TIME_STATS_KEY);
                                         const timeStats = timeStatsRaw ? JSON.parse(timeStatsRaw) : { totalMinutes: 0, days: [] };
                                         const hours = Math.floor(timeStats.totalMinutes / 60);
@@ -1042,6 +1082,7 @@
 
                                         return (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                                                {/* Card Editais */}
                                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 col-span-1 md:col-span-2">
                                                     <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Icon name="list" size={20} className="text-green-500"/> Progresso Geral dos Editais</h3>
                                                     <div className="grid grid-cols-2 gap-4">
@@ -1060,6 +1101,36 @@
                                                     </div>
                                                 </div>
 
+                                                {/* Card Progresso por Edital */}
+                                                {editaisStats.length > 0 && (
+                                                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 col-span-1 md:col-span-2">
+                                                        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                                            <Icon name="list" size={20} className="text-blue-500"/> Progresso por Edital
+                                                        </h3>
+                                                        <div className="space-y-3">
+                                                            {editaisStats.map(ed => (
+                                                                <div key={ed.id} onClick={() => handleItemClick(ed)} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-100 group">
+                                                                    <div className="flex-1 min-w-0 pr-4">
+                                                                        <p className="text-sm font-medium text-gray-700 truncate group-hover:text-blue-600">{ed.name}</p>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-4 text-xs text-gray-500 shrink-0">
+                                                                        <div className="flex flex-col items-end w-24">
+                                                                            <div className="flex justify-between w-full mb-1">
+                                                                                <span className="font-bold text-gray-700">{ed.stats.pctLido}%</span>
+                                                                                <span className="text-gray-400">{ed.stats.lido}/{ed.stats.total}</span>
+                                                                            </div>
+                                                                            <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                                                                <div className="bg-blue-500 h-full rounded-full" style={{width: `${ed.stats.pctLido}%`}}></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Card Tempo */}
                                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                                                     <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Icon name="clock" size={20} className="text-blue-500"/> Tempo de Estudo (Global)</h3>
                                                     <div className="space-y-4">
@@ -1075,6 +1146,7 @@
                                                     </div>
                                                 </div>
 
+                                                {/* Card Inventário */}
                                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                                                     <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Icon name="database" size={20} className="text-gray-500"/> Arquivos na Pasta</h3>
                                                     <div className="grid grid-cols-2 gap-2 text-sm">
@@ -1087,6 +1159,7 @@
                                                     </div>
                                                 </div>
 
+                                                {/* Card Top 10 */}
                                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 col-span-1 md:col-span-2">
                                                     <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Icon name="trophy" size={20} className="text-yellow-500"/> Top 10 Mais Visualizados</h3>
                                                     {topViewed.length === 0 ? (
